@@ -474,7 +474,7 @@ function normalizeUsername(value) {
 }
 
 function validatePassword(password) {
-  if (String(password).length < 8) throw new HttpError(400, "Password must be at least 8 characters");
+  if (String(password).length < 4) throw new HttpError(400, "Password must be at least 4 characters");
 }
 
 async function hashPassword(password, salt = encodeHex(crypto.getRandomValues(new Uint8Array(16)))) {

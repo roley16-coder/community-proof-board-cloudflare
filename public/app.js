@@ -53,10 +53,6 @@ els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
 els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
-els.imageModal.addEventListener("click", onModalBackdropClick);
-els.imageModalClose.addEventListener("click", closeImageModal);
-els.imageModalContent.addEventListener("error", onModalImageError);
-document.addEventListener("keydown", onKeydown);
 
 await loadApp();
 
@@ -176,11 +172,11 @@ function renderPosts() {
       const item = document.createElement("div");
       item.className = "post-image-card";
 
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "image-open-button";
-      button.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
-      button.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "image-open-button";
+        button.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
+        button.addEventListener("click", () => openImageInNewTab(image.url));
 
       const meta = document.createElement("span");
       meta.className = "post-image-type";
@@ -205,38 +201,11 @@ function renderPosts() {
   }
 }
 
-function openImageModal(src, alt) {
-  els.imageModal.hidden = false;
-  els.imageModalContent.alt = alt;
-  els.imageModalContent.removeAttribute("src");
-  document.body.style.overflow = "hidden";
-
-  requestAnimationFrame(() => {
-    els.imageModalContent.src = src;
-  });
-}
-
-function onModalBackdropClick(event) {
-  if (event.target === els.imageModal) {
-    closeImageModal();
+function openImageInNewTab(src) {
+  const opened = window.open(src, "_blank", "noopener,noreferrer");
+  if (!opened) {
+    window.alert("새 탭을 열지 못했습니다. 팝업 차단을 확인해주세요.");
   }
-}
-
-function onKeydown(event) {
-  if (event.key === "Escape" && !els.imageModal.hidden) {
-    closeImageModal();
-  }
-}
-
-function onModalImageError() {
-  closeImageModal();
-  window.alert("이미지를 불러오지 못했습니다. 기존에 저장된 깨진 이미지일 수 있습니다.");
-}
-
-function closeImageModal() {
-  els.imageModal.hidden = true;
-  els.imageModalContent.removeAttribute("src");
-  document.body.style.overflow = "";
 }
 
 async function onBootstrap(event) {
