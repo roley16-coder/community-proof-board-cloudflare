@@ -335,10 +335,10 @@ async function captureRemoteScreenshot(url, env) {
   const browser = await puppeteer.launch(env.BROWSER);
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1600, height: 1200, deviceScaleFactor: 1.5 });
+    await page.setViewport({ width: 1920, height: 1280, deviceScaleFactor: 1 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
-    await page.addStyleTag({ content: "html, body { zoom: 0.75 !important; }" });
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await new Promise((resolve) => setTimeout(resolve, 2000));
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
     await browser.close();
