@@ -335,14 +335,80 @@ async function captureRemoteScreenshot(url, env) {
   const browser = await puppeteer.launch(env.BROWSER);
   try {
     const page = await browser.newPage();
-    await page.setViewport({ width: 1440, height: 2200, deviceScaleFactor: 1 });
+    await page.setViewport({ width: 1600, height: 1800, deviceScaleFactor: 2 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.addStyleTag({ content: "html, body { zoom: 0.5 !important; }" });
     await new Promise((resolve) => setTimeout(resolve, 1500));
-    return await page.screenshot({ type: "png", fullPage: true });
+    const clip = await computeCaptureClip(page);
+    return await page.screenshot({ type: "png", clip });
   } finally {
     await browser.close();
   }
+}
+
+async function computeCaptureClip(page) {
+  const viewport = page.viewport() || { width: 1600, height: 1800 };
+  const bounds = await page.evaluate(() => {
+    const padding = 24;
+    const candidates = [];
+    const selector = [
+      "main",
+      "article",
+      "[role='main']",
+      ".container",
+      ".content",
+      "#content",
+      "#main",
+      ".main"
+    ].join(",");
+
+    for (const el of document.querySelectorAll(selector)) {
+      const rect = el.getBoundingClientRect();
+      if (rect.width > 240 && rect.height > 180) {
+        candidates.push(rect);
+      }
+    }
+
+    if (!candidates.length) {
+      const all = [...document.body.querySelectorAll("*")];
+      for (const el of all) {
+        const style = window.getComputedStyle(el);
+        if (style.display === "none" || style.visibility === "hidden" || style.position === "fixed") continue;
+        const rect = el.getBoundingClientRect();
+        if (rect.width < 180 || rect.height < 40) continue;
+        if (!el.textContent?.trim() && !el.querySelector("img, video, canvas, svg")) continue;
+        candidates.push(rect);
+      }
+    }
+
+    if (!candidates.length) {
+      return {
+        x: 0,
+        y: 0,
+        width: Math.min(window.innerWidth, document.documentElement.scrollWidth),
+        height: Math.min(window.innerHeight, document.documentElement.scrollHeight)
+      };
+    }
+
+    const left = Math.max(0, Math.min(...candidates.map((rect) => rect.left)) - padding);
+    const top = Math.max(0, Math.min(...candidates.map((rect) => rect.top)) - padding);
+    const right = Math.max(...candidates.map((rect) => rect.right)) + padding;
+    const bottom = Math.max(...candidates.map((rect) => rect.bottom)) + padding;
+
+    return {
+      x: left,
+      y: top,
+      width: Math.max(320, right - left),
+      height: Math.max(600, bottom - top)
+    };
+  });
+
+  return {
+    x: Math.max(0, Math.floor(bounds.x)),
+    y: Math.max(0, Math.floor(bounds.y)),
+    width: Math.min(viewport.width, Math.ceil(bounds.width)),
+    height: Math.min(1200, Math.min(viewport.height, Math.ceil(bounds.height)))
+  };
 }
 
 async function getSession(request, env) {
