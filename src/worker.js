@@ -338,7 +338,7 @@ async function captureRemoteScreenshot(url, env) {
     await page.setViewport({ width: 1440, height: 2200, deviceScaleFactor: 1 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.addStyleTag({ content: "html, body { zoom: 0.5 !important; }" });
-    await page.waitForTimeout(1500);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     return await page.screenshot({ type: "png", fullPage: true });
   } finally {
     await browser.close();
