@@ -55,6 +55,7 @@ els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
 els.imageModal.addEventListener("click", onModalBackdropClick);
 els.imageModalClose.addEventListener("click", closeImageModal);
+els.imageModalContent.addEventListener("error", onModalImageError);
 document.addEventListener("keydown", onKeydown);
 
 await loadApp();
@@ -103,6 +104,7 @@ function showLoggedIn() {
   els.logoutButton.hidden = false;
   els.refreshButton.hidden = false;
   els.sessionInfo.textContent = `${state.session.display_name} (${state.session.username}) · ${state.session.role}`;
+
   const isAdmin = state.session.role === "admin";
   els.adminUserCard.hidden = !isAdmin;
   els.adminPostCard.hidden = !isAdmin;
@@ -113,12 +115,13 @@ function showLoggedIn() {
 
 async function loadUsersIfAdmin() {
   if (state.session.role !== "admin") return;
+
   const res = await fetchJson("/api/users");
   state.users = res.users || [];
   els.userList.innerHTML = "";
   els.assignedUserId.innerHTML = "";
 
-  state.users.forEach((user) => {
+  for (const user of state.users) {
     const article = document.createElement("article");
     article.className = "user-item";
     article.innerHTML = `<strong>${escapeHtml(user.display_name)}</strong><span>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</span>`;
@@ -128,16 +131,14 @@ async function loadUsersIfAdmin() {
     option.value = user.id;
     option.textContent = `${user.display_name} (${user.username})`;
     els.assignedUserId.appendChild(option);
-  });
+  }
 
   const hasUsers = state.users.length > 0;
   els.postSubmitButton.disabled = !hasUsers;
+
   if (!hasUsers) {
     showMessage(els.postFormMessage, "먼저 보여줄 사용자 계정을 하나 이상 만들어주세요.", "error");
-  } else if (
-    els.postFormMessage.dataset.kind === "error" &&
-    els.postFormMessage.textContent.includes("먼저 보여줄 사용자")
-  ) {
+  } else if (els.postFormMessage.textContent.includes("먼저 보여줄 사용자")) {
     hideMessage(els.postFormMessage);
   }
 }
@@ -152,13 +153,14 @@ function renderPosts() {
   els.posts.innerHTML = "";
   els.emptyState.hidden = state.posts.length > 0;
 
-  state.posts.forEach((post) => {
+  for (const post of state.posts) {
     const fragment = els.postTemplate.content.cloneNode(true);
     fragment.querySelector(".post-location").textContent = post.location;
     fragment.querySelector(".post-title").textContent = post.title || "제목 없음";
     fragment.querySelector(".post-date").textContent = formatDate(post.posted_date);
     fragment.querySelector(".post-meta").textContent = `대상 계정: ${post.assigned_username} · 등록자: ${post.created_by_username}`;
     fragment.querySelector(".post-recheck").textContent = buildRecheckText(post);
+    fragment.querySelector(".post-content").textContent = post.content || "코멘트 없음";
 
     const sourceWrap = fragment.querySelector(".post-source-wrap");
     const sourceLink = fragment.querySelector(".post-source");
@@ -168,31 +170,26 @@ function renderPosts() {
       sourceLink.textContent = post.source_url;
     }
 
-    fragment.querySelector(".post-content").textContent = post.content || "코멘트 없음";
-
     const imageWrap = fragment.querySelector(".post-images");
     const images = post.images || [];
-    if (images.length > 0) {
-      images.forEach((image, index) => {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "image-open-button";
-        button.textContent = images.length === 1
-          ? "사진 보기"
-          : `사진 보기 ${index + 1}`;
-        button.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
+    images.forEach((image, index) => {
+      const item = document.createElement("div");
+      item.className = "post-image-card";
 
-        const meta = document.createElement("span");
-        meta.className = "post-image-type";
-        meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "image-open-button";
+      button.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
+      button.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
 
-        const item = document.createElement("div");
-        item.className = "post-image-card";
-        item.appendChild(button);
-        item.appendChild(meta);
-        imageWrap.appendChild(item);
-      });
-    }
+      const meta = document.createElement("span");
+      meta.className = "post-image-type";
+      meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
+
+      item.appendChild(button);
+      item.appendChild(meta);
+      imageWrap.appendChild(item);
+    });
 
     const deleteButton = fragment.querySelector(".post-delete");
     if (state.session.role === "admin") {
@@ -205,14 +202,18 @@ function renderPosts() {
     }
 
     els.posts.appendChild(fragment);
-  });
+  }
 }
 
 function openImageModal(src, alt) {
-  els.imageModalContent.src = src;
-  els.imageModalContent.alt = alt;
   els.imageModal.hidden = false;
+  els.imageModalContent.alt = alt;
+  els.imageModalContent.removeAttribute("src");
   document.body.style.overflow = "hidden";
+
+  requestAnimationFrame(() => {
+    els.imageModalContent.src = src;
+  });
 }
 
 function onModalBackdropClick(event) {
@@ -227,14 +228,20 @@ function onKeydown(event) {
   }
 }
 
+function onModalImageError() {
+  closeImageModal();
+  window.alert("이미지를 불러오지 못했습니다. 기존에 저장된 깨진 이미지일 수 있습니다.");
+}
+
 function closeImageModal() {
   els.imageModal.hidden = true;
-  els.imageModalContent.src = "";
+  els.imageModalContent.removeAttribute("src");
   document.body.style.overflow = "";
 }
 
 async function onBootstrap(event) {
   event.preventDefault();
+
   try {
     await fetchJson("/api/bootstrap", {
       method: "POST",
@@ -244,6 +251,7 @@ async function onBootstrap(event) {
         password: els.bootstrapPassword.value
       })
     });
+
     window.alert("최초 관리자 계정 생성이 완료되었습니다. 이제 로그인해주세요.");
     els.bootstrapForm.reset();
     els.bootstrapCard.hidden = true;
@@ -255,6 +263,7 @@ async function onBootstrap(event) {
 
 async function onLogin(event) {
   event.preventDefault();
+
   try {
     await fetchJson("/api/login", {
       method: "POST",
@@ -263,6 +272,7 @@ async function onLogin(event) {
         password: els.loginPassword.value
       })
     });
+
     els.loginForm.reset();
     await loadApp();
   } catch (error) {
@@ -289,6 +299,7 @@ async function onCreateUser(event) {
         role: els.newRole.value
       })
     });
+
     els.userForm.reset();
     els.newRole.value = "viewer";
     showMessage(els.userFormMessage, "사용자 계정을 만들었습니다.", "success");
@@ -302,6 +313,7 @@ async function onCreatePost(event) {
   event.preventDefault();
   hideMessage(els.postFormMessage);
   els.postSubmitButton.disabled = true;
+
   const originalLabel = els.postSubmitButton.textContent;
   els.postSubmitButton.textContent = "링크 접속 후 캡처 중...";
 
@@ -342,6 +354,7 @@ async function fetchJson(url, options = {}) {
       ...(options.headers || {})
     }
   };
+
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || "요청이 실패했습니다.");
