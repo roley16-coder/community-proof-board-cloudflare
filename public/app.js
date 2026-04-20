@@ -39,7 +39,10 @@ const els = {
   roleMessage: document.getElementById("roleMessage"),
   posts: document.getElementById("posts"),
   emptyState: document.getElementById("emptyState"),
-  postTemplate: document.getElementById("postTemplate")
+  postTemplate: document.getElementById("postTemplate"),
+  imageModal: document.getElementById("imageModal"),
+  imageModalClose: document.getElementById("imageModalClose"),
+  imageModalContent: document.getElementById("imageModalContent")
 };
 
 els.postDate.value = new Date().toISOString().slice(0, 10);
@@ -50,6 +53,8 @@ els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
 els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
+els.imageModal.addEventListener("click", closeImageModal);
+els.imageModalClose.addEventListener("click", closeImageModal);
 
 await loadApp();
 
@@ -128,7 +133,10 @@ async function loadUsersIfAdmin() {
   els.postSubmitButton.disabled = !hasUsers;
   if (!hasUsers) {
     showMessage(els.postFormMessage, "먼저 보여줄 사용자 계정을 하나 이상 만들어주세요.", "error");
-  } else if (els.postFormMessage.dataset.kind === "error" && els.postFormMessage.textContent.includes("먼저 보여줄 사용자")) {
+  } else if (
+    els.postFormMessage.dataset.kind === "error" &&
+    els.postFormMessage.textContent.includes("먼저 보여줄 사용자")
+  ) {
     hideMessage(els.postFormMessage);
   }
 }
@@ -163,13 +171,10 @@ function renderPosts() {
 
     const imageWrap = fragment.querySelector(".post-images");
     (post.images || []).forEach((image) => {
-      const card = document.createElement("div");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = "post-image-card";
-
-      const link = document.createElement("a");
-      link.href = image.url;
-      link.target = "_blank";
-      link.rel = "noopener";
+      card.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
 
       const img = document.createElement("img");
       img.src = image.url;
@@ -179,8 +184,7 @@ function renderPosts() {
       meta.className = "post-image-type";
       meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
 
-      link.appendChild(img);
-      card.appendChild(link);
+      card.appendChild(img);
       card.appendChild(meta);
       imageWrap.appendChild(card);
     });
@@ -197,6 +201,20 @@ function renderPosts() {
 
     els.posts.appendChild(fragment);
   });
+}
+
+function openImageModal(src, alt) {
+  els.imageModalContent.src = src;
+  els.imageModalContent.alt = alt;
+  els.imageModal.hidden = false;
+  document.body.style.overflow = "hidden";
+}
+
+function closeImageModal(event) {
+  if (event && event.target !== els.imageModal && event.target !== els.imageModalClose) return;
+  els.imageModal.hidden = true;
+  els.imageModalContent.src = "";
+  document.body.style.overflow = "";
 }
 
 async function onBootstrap(event) {

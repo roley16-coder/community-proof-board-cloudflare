@@ -90,7 +90,7 @@
               <input id="postEnableRecheck" type="checkbox">
               <span>22시간 뒤 자동 재체크 요청</span>
             </label>
-            <p class="helper-text">등록 즉시 해당 링크에 접속해서 화면 축소 상태로 캡처하고, 저장된 이미지는 목록에서 바로 확인할 수 있습니다.</p>
+            <p class="helper-text">목록에서는 작은 미리보기만 보이고, 이미지를 누르면 크게 열리고 다시 누르면 닫힙니다.</p>
             <button id="postSubmitButton" class="primary-button" type="submit">게시글 등록</button>
           </form>
         </section>
@@ -113,6 +113,11 @@
         </section>
       </section>
     </main>
+  </div>
+
+  <div id="imageModal" class="image-modal" hidden>
+    <button id="imageModalClose" class="image-modal-close" type="button" aria-label="닫기">×</button>
+    <img id="imageModalContent" class="image-modal-content" alt="확대 이미지">
   </div>
 
   <template id="postTemplate">
