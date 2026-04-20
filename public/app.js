@@ -53,8 +53,9 @@ els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
 els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
-els.imageModal.addEventListener("click", closeImageModal);
+els.imageModal.addEventListener("click", onModalBackdropClick);
 els.imageModalClose.addEventListener("click", closeImageModal);
+document.addEventListener("keydown", onKeydown);
 
 await loadApp();
 
@@ -214,8 +215,19 @@ function openImageModal(src, alt) {
   document.body.style.overflow = "hidden";
 }
 
-function closeImageModal(event) {
-  if (event && event.target !== els.imageModal && event.target !== els.imageModalClose) return;
+function onModalBackdropClick(event) {
+  if (event.target === els.imageModal) {
+    closeImageModal();
+  }
+}
+
+function onKeydown(event) {
+  if (event.key === "Escape" && !els.imageModal.hidden) {
+    closeImageModal();
+  }
+}
+
+function closeImageModal() {
   els.imageModal.hidden = true;
   els.imageModalContent.src = "";
   document.body.style.overflow = "";

@@ -11,6 +11,7 @@
   --radius-md: 16px;
 }
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body {
   margin: 0;
   font-family: "Pretendard", "Segoe UI", sans-serif;
@@ -152,6 +153,7 @@ textarea { resize: vertical; min-height: 96px; }
   position: absolute;
   top: 20px;
   right: 20px;
+  z-index: 1;
   width: 44px;
   height: 44px;
   border: 0;
