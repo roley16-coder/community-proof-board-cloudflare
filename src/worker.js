@@ -338,6 +338,7 @@ async function captureRemoteScreenshot(url, env) {
     await page.setViewport({ width: 1920, height: 1280, deviceScaleFactor: 1 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.evaluate(() => window.scrollTo(0, 0));
+    await waitForPostContent(page);
     await waitForPostImages(page);
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return await page.screenshot({ type: "png", fullPage: false });
@@ -346,12 +347,70 @@ async function captureRemoteScreenshot(url, env) {
   }
 }
 
-async function waitForPostImages(page) {
+async function waitForPostContent(page) {
   await page.waitForFunction(() => {
-    const targetImages = [...document.querySelectorAll("img.maxImg, img[src*='/editor/'], img[src*='/qb_partnersaleinfo/']")];
-    if (!targetImages.length) return true;
+    const rendered = document.querySelector("#new_contents");
+    const hiddenSource = document.querySelector("#org_contents");
+    return Boolean(
+      (rendered && rendered.textContent && rendered.textContent.trim().length > 20) ||
+      (rendered && rendered.querySelector("img")) ||
+      (hiddenSource && "value" in hiddenSource && hiddenSource.value && hiddenSource.value.trim().length > 20)
+    );
+  }, { timeout: 15000 }).catch(() => null);
+
+  await page.evaluate(() => {
+    const rendered = document.querySelector("#new_contents");
+    const hiddenSource = document.querySelector("#org_contents");
+    if (!rendered || !hiddenSource || !("value" in hiddenSource)) return;
+    if (rendered.children.length > 0 || rendered.textContent.trim()) return;
+    rendered.innerHTML = hiddenSource.value;
+  });
+}
+
+async function waitForPostImages(page) {
+  await page.evaluate(() => {
+    const targetImages = [...document.querySelectorAll(
+      "#new_contents img, .view-content img, img.maxImg, img[src*='img2.quasarzone.com/editor/'], img[src*='/qb_partnersaleinfo/']"
+    )];
+    for (const img of targetImages) {
+      img.loading = "eager";
+      img.decoding = "sync";
+      if (img.dataset?.src && !img.src) img.src = img.dataset.src;
+      if (img.dataset?.original && !img.src) img.src = img.dataset.original;
+    }
+    targetImages[0]?.scrollIntoView({ block: "center" });
+  }).catch(() => null);
+
+  await page.waitForFunction(() => {
+    const targetImages = [...document.querySelectorAll(
+      "#new_contents img, .view-content img, img.maxImg, img[src*='img2.quasarzone.com/editor/'], img[src*='/qb_partnersaleinfo/']"
+    )].filter((img) => {
+      const src = img.getAttribute("src") || "";
+      return src.includes("img2.quasarzone.com/editor/") || src.includes("/qb_partnersaleinfo/") || img.closest("#new_contents");
+    });
+
+    if (!targetImages.length) return false;
     return targetImages.every((img) => img.complete && img.naturalWidth > 0);
-  }, { timeout: 10000 }).catch(() => null);
+  }, { timeout: 15000 }).catch(() => null);
+
+  await page.evaluate(async () => {
+    const targetImages = [...document.querySelectorAll(
+      "#new_contents img, .view-content img, img.maxImg, img[src*='img2.quasarzone.com/editor/'], img[src*='/qb_partnersaleinfo/']"
+    )].slice(0, 8);
+
+    await Promise.all(targetImages.map(async (img) => {
+      if (img.complete && img.naturalWidth > 0) return;
+      try {
+        if (typeof img.decode === "function") {
+          await img.decode();
+        }
+      } catch (_) {
+        // ignore decode failures and allow the caller to continue with the best available render
+      }
+    }));
+  }).catch(() => null);
+
+  await page.evaluate(() => window.scrollTo(0, 0)).catch(() => null);
 }
 
 async function getSession(request, env) {
