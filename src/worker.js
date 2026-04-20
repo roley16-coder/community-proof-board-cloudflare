@@ -214,21 +214,18 @@ async function handleCreatePost(request, env, session) {
   const location = String(form.get("location") || "").trim();
   const sourceUrl = nullableString(form.get("sourceUrl"));
   const enableRecheck = String(form.get("enableRecheck") || "") === "1";
-  const imageFiles = form.getAll("images").filter((file) => file instanceof File);
 
-  if (!assignedUserId || !postedDate || !location) {
-    return json({ error: "assignedUserId, postedDate, location are required" }, { status: 400 });
-  }
-  if (imageFiles.length > 30) {
-    return json({ error: "Maximum 30 images per post" }, { status: 400 });
+  if (!assignedUserId || !postedDate || !location || !sourceUrl) {
+    return json({ error: "assignedUserId, postedDate, location, sourceUrl are required" }, { status: 400 });
   }
 
   const assignedUser = await env.DB.prepare("SELECT id, username FROM users WHERE id = ?").bind(assignedUserId).first();
   if (!assignedUser) return json({ error: "Assigned user not found" }, { status: 404 });
 
+  const screenshot = await captureRemoteScreenshot(sourceUrl, env);
   const postId = crypto.randomUUID();
-  const recheckDueAt = enableRecheck && sourceUrl ? new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString() : null;
-  const recheckStatus = enableRecheck && sourceUrl ? "scheduled" : "none";
+  const recheckDueAt = enableRecheck ? new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString() : null;
+  const recheckStatus = enableRecheck ? "scheduled" : "none";
 
   await env.DB.prepare(`
     INSERT INTO posts
@@ -242,23 +239,20 @@ async function handleCreatePost(request, env, session) {
     postedDate,
     location,
     sourceUrl,
-    enableRecheck && sourceUrl ? 1 : 0,
+    enableRecheck ? 1 : 0,
     recheckDueAt,
     recheckStatus,
     session.user.id
   ).run();
 
-  for (const imageFile of imageFiles) {
-    const imageId = crypto.randomUUID();
-    const ext = extensionFromType(imageFile.type);
-    const objectKey = `${postId}/${imageId}.${ext}`;
-    await env.IMAGES_BUCKET.put(objectKey, await imageFile.arrayBuffer(), {
-      httpMetadata: { contentType: imageFile.type || "application/octet-stream" }
-    });
-    await env.DB.prepare(
-      "INSERT INTO post_images (id, post_id, object_key, content_type, capture_type) VALUES (?, ?, ?, ?, 'manual')"
-    ).bind(imageId, postId, objectKey, imageFile.type || "application/octet-stream").run();
-  }
+  const imageId = crypto.randomUUID();
+  const objectKey = `${postId}/${imageId}.png`;
+  await env.IMAGES_BUCKET.put(objectKey, screenshot, {
+    httpMetadata: { contentType: "image/png" }
+  });
+  await env.DB.prepare(
+    "INSERT INTO post_images (id, post_id, object_key, content_type, capture_type) VALUES (?, ?, ?, 'image/png', 'initial')"
+  ).bind(imageId, postId, objectKey).run();
 
   return json({ success: true, postId });
 }
@@ -345,7 +339,7 @@ async function captureRemoteScreenshot(url, env) {
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.addStyleTag({ content: "html, body { zoom: 0.5 !important; }" });
     await page.waitForTimeout(1500);
-    return await page.screenshot({ type: "png", fullPage: false });
+    return await page.screenshot({ type: "png", fullPage: true });
   } finally {
     await browser.close();
   }
@@ -474,13 +468,6 @@ function buildSessionCookie(env, token, expiresAt) {
 
 function cookieName(env) {
   return env.SESSION_COOKIE_NAME || "cpb_session";
-}
-
-function extensionFromType(type) {
-  if (type === "image/png") return "png";
-  if (type === "image/webp") return "webp";
-  if (type === "image/gif") return "gif";
-  return "jpg";
 }
 
 function withCors(response) {

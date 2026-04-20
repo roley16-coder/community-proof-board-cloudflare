@@ -18,6 +18,7 @@ const els = {
   logoutButton: document.getElementById("logoutButton"),
   adminUserCard: document.getElementById("adminUserCard"),
   userForm: document.getElementById("userForm"),
+  userFormMessage: document.getElementById("userFormMessage"),
   newUsername: document.getElementById("newUsername"),
   newDisplayName: document.getElementById("newDisplayName"),
   newPassword: document.getElementById("newPassword"),
@@ -25,6 +26,7 @@ const els = {
   userList: document.getElementById("userList"),
   adminPostCard: document.getElementById("adminPostCard"),
   postForm: document.getElementById("postForm"),
+  postFormMessage: document.getElementById("postFormMessage"),
   assignedUserId: document.getElementById("assignedUserId"),
   postTitle: document.getElementById("postTitle"),
   postContent: document.getElementById("postContent"),
@@ -32,7 +34,7 @@ const els = {
   postLocation: document.getElementById("postLocation"),
   postSourceUrl: document.getElementById("postSourceUrl"),
   postEnableRecheck: document.getElementById("postEnableRecheck"),
-  postImages: document.getElementById("postImages"),
+  postSubmitButton: document.getElementById("postSubmitButton"),
   refreshButton: document.getElementById("refreshButton"),
   roleMessage: document.getElementById("roleMessage"),
   posts: document.getElementById("posts"),
@@ -47,28 +49,33 @@ els.loginForm.addEventListener("submit", onLogin);
 els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
 els.postForm.addEventListener("submit", onCreatePost);
-els.refreshButton.addEventListener("click", loadApp);
+els.refreshButton.addEventListener("click", onRefresh);
 
 await loadApp();
 
 async function loadApp() {
-  const sessionRes = await fetchJson("/api/session");
-  state.session = sessionRes.user;
+  try {
+    const sessionRes = await fetchJson("/api/session");
+    state.session = sessionRes.user;
 
-  if (!state.session) {
-    showLoggedOut();
-    if (sessionRes.bootstrapNeeded) {
-      els.bootstrapCard.hidden = false;
-      els.loginCard.hidden = true;
-    } else {
-      els.bootstrapCard.hidden = true;
-      els.loginCard.hidden = false;
+    if (!state.session) {
+      showLoggedOut();
+      if (sessionRes.bootstrapNeeded) {
+        els.bootstrapCard.hidden = false;
+        els.loginCard.hidden = true;
+      } else {
+        els.bootstrapCard.hidden = true;
+        els.loginCard.hidden = false;
+      }
+      return;
     }
-    return;
-  }
 
-  showLoggedIn();
-  await Promise.all([loadUsersIfAdmin(), loadPosts()]);
+    showLoggedIn();
+    await Promise.all([loadUsersIfAdmin(), loadPosts()]);
+  } catch (error) {
+    console.error(error);
+    window.alert(error.message || "앱 정보를 불러오지 못했습니다.");
+  }
 }
 
 function showLoggedOut() {
@@ -76,8 +83,9 @@ function showLoggedOut() {
   els.logoutButton.hidden = true;
   els.adminUserCard.hidden = true;
   els.adminPostCard.hidden = true;
+  els.refreshButton.hidden = true;
   els.loginCard.hidden = false;
-  els.roleMessage.textContent = "로그인 후 게시글을 볼 수 있습니다.";
+  els.roleMessage.textContent = "로그인 후 게시글 목록을 확인할 수 있습니다.";
   els.posts.innerHTML = "";
   els.emptyState.hidden = false;
 }
@@ -93,8 +101,8 @@ function showLoggedIn() {
   els.adminUserCard.hidden = !isAdmin;
   els.adminPostCard.hidden = !isAdmin;
   els.roleMessage.textContent = isAdmin
-    ? "관리자는 전체 게시글을 보고 사용자/게시글을 관리할 수 있습니다."
-    : "현재 계정에 배정된 게시글만 보여집니다.";
+    ? "관리자는 전체 게시글을 보고 사용자 계정과 게시글을 관리할 수 있습니다."
+    : "현재 계정에 배정된 게시글만 표시됩니다.";
 }
 
 async function loadUsersIfAdmin() {
@@ -103,6 +111,7 @@ async function loadUsersIfAdmin() {
   state.users = res.users || [];
   els.userList.innerHTML = "";
   els.assignedUserId.innerHTML = "";
+
   state.users.forEach((user) => {
     const article = document.createElement("article");
     article.className = "user-item";
@@ -114,6 +123,14 @@ async function loadUsersIfAdmin() {
     option.textContent = `${user.display_name} (${user.username})`;
     els.assignedUserId.appendChild(option);
   });
+
+  const hasUsers = state.users.length > 0;
+  els.postSubmitButton.disabled = !hasUsers;
+  if (!hasUsers) {
+    showMessage(els.postFormMessage, "먼저 보여줄 사용자 계정을 하나 이상 만들어주세요.", "error");
+  } else if (els.postFormMessage.dataset.kind === "error" && els.postFormMessage.textContent.includes("먼저 보여줄 사용자")) {
+    hideMessage(els.postFormMessage);
+  }
 }
 
 async function loadPosts() {
@@ -125,6 +142,7 @@ async function loadPosts() {
 function renderPosts() {
   els.posts.innerHTML = "";
   els.emptyState.hidden = state.posts.length > 0;
+
   state.posts.forEach((post) => {
     const fragment = els.postTemplate.content.cloneNode(true);
     fragment.querySelector(".post-location").textContent = post.location;
@@ -132,6 +150,7 @@ function renderPosts() {
     fragment.querySelector(".post-date").textContent = formatDate(post.posted_date);
     fragment.querySelector(".post-meta").textContent = `대상 계정: ${post.assigned_username} · 등록자: ${post.created_by_username}`;
     fragment.querySelector(".post-recheck").textContent = buildRecheckText(post);
+
     const sourceWrap = fragment.querySelector(".post-source-wrap");
     const sourceLink = fragment.querySelector(".post-source");
     if (post.source_url) {
@@ -139,19 +158,29 @@ function renderPosts() {
       sourceLink.href = post.source_url;
       sourceLink.textContent = post.source_url;
     }
-    fragment.querySelector(".post-content").textContent = post.content || "내용 없음";
+
+    fragment.querySelector(".post-content").textContent = post.content || "코멘트 없음";
 
     const imageWrap = fragment.querySelector(".post-images");
     (post.images || []).forEach((image) => {
       const card = document.createElement("div");
       card.className = "post-image-card";
+
+      const link = document.createElement("a");
+      link.href = image.url;
+      link.target = "_blank";
+      link.rel = "noopener";
+
       const img = document.createElement("img");
       img.src = image.url;
-      img.alt = post.title || "게시 이미지";
+      img.alt = post.title || "게시 캡처 이미지";
+
       const meta = document.createElement("span");
       meta.className = "post-image-type";
-      meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 이미지";
-      card.appendChild(img);
+      meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
+
+      link.appendChild(img);
+      card.appendChild(link);
       card.appendChild(meta);
       imageWrap.appendChild(card);
     });
@@ -172,31 +201,39 @@ function renderPosts() {
 
 async function onBootstrap(event) {
   event.preventDefault();
-  await fetchJson("/api/bootstrap", {
-    method: "POST",
-    body: JSON.stringify({
-      username: els.bootstrapUsername.value,
-      displayName: els.bootstrapDisplayName.value,
-      password: els.bootstrapPassword.value
-    })
-  });
-  window.alert("최초 관리자 생성이 완료되었습니다. 이제 로그인하세요.");
-  els.bootstrapForm.reset();
-  els.bootstrapCard.hidden = true;
-  els.loginCard.hidden = false;
+  try {
+    await fetchJson("/api/bootstrap", {
+      method: "POST",
+      body: JSON.stringify({
+        username: els.bootstrapUsername.value,
+        displayName: els.bootstrapDisplayName.value,
+        password: els.bootstrapPassword.value
+      })
+    });
+    window.alert("최초 관리자 계정 생성이 완료되었습니다. 이제 로그인해주세요.");
+    els.bootstrapForm.reset();
+    els.bootstrapCard.hidden = true;
+    els.loginCard.hidden = false;
+  } catch (error) {
+    window.alert(error.message || "관리자 계정을 만들지 못했습니다.");
+  }
 }
 
 async function onLogin(event) {
   event.preventDefault();
-  await fetchJson("/api/login", {
-    method: "POST",
-    body: JSON.stringify({
-      username: els.loginUsername.value,
-      password: els.loginPassword.value
-    })
-  });
-  els.loginForm.reset();
-  await loadApp();
+  try {
+    await fetchJson("/api/login", {
+      method: "POST",
+      body: JSON.stringify({
+        username: els.loginUsername.value,
+        password: els.loginPassword.value
+      })
+    });
+    els.loginForm.reset();
+    await loadApp();
+  } catch (error) {
+    window.alert(error.message || "로그인에 실패했습니다.");
+  }
 }
 
 async function onLogout() {
@@ -206,43 +243,87 @@ async function onLogout() {
 
 async function onCreateUser(event) {
   event.preventDefault();
-  await fetchJson("/api/users", {
-    method: "POST",
-    body: JSON.stringify({
-      username: els.newUsername.value,
-      displayName: els.newDisplayName.value,
-      password: els.newPassword.value,
-      role: els.newRole.value
-    })
-  });
-  els.userForm.reset();
-  els.newRole.value = "viewer";
-  await loadUsersIfAdmin();
+  hideMessage(els.userFormMessage);
+
+  try {
+    await fetchJson("/api/users", {
+      method: "POST",
+      body: JSON.stringify({
+        username: els.newUsername.value,
+        displayName: els.newDisplayName.value,
+        password: els.newPassword.value,
+        role: els.newRole.value
+      })
+    });
+    els.userForm.reset();
+    els.newRole.value = "viewer";
+    showMessage(els.userFormMessage, "사용자 계정을 만들었습니다.", "success");
+    await loadUsersIfAdmin();
+  } catch (error) {
+    showMessage(els.userFormMessage, error.message || "사용자 계정을 만들지 못했습니다.", "error");
+  }
 }
 
 async function onCreatePost(event) {
   event.preventDefault();
-  const form = new FormData();
-  form.append("assignedUserId", els.assignedUserId.value);
-  form.append("title", els.postTitle.value);
-  form.append("content", els.postContent.value);
-  form.append("postedDate", els.postDate.value);
-  form.append("location", els.postLocation.value);
-  form.append("sourceUrl", els.postSourceUrl.value);
-  form.append("enableRecheck", els.postEnableRecheck.checked ? "1" : "0");
-  [...els.postImages.files].forEach((file) => form.append("images", file));
-  await fetchJson("/api/posts", { method: "POST", body: form });
-  els.postForm.reset();
-  els.postDate.value = new Date().toISOString().slice(0, 10);
-  await loadPosts();
+  hideMessage(els.postFormMessage);
+  els.postSubmitButton.disabled = true;
+  const originalLabel = els.postSubmitButton.textContent;
+  els.postSubmitButton.textContent = "링크 접속 후 캡처 중...";
+
+  try {
+    const form = new FormData();
+    form.append("assignedUserId", els.assignedUserId.value);
+    form.append("title", els.postTitle.value);
+    form.append("content", els.postContent.value);
+    form.append("postedDate", els.postDate.value);
+    form.append("location", els.postLocation.value);
+    form.append("sourceUrl", els.postSourceUrl.value);
+    form.append("enableRecheck", els.postEnableRecheck.checked ? "1" : "0");
+
+    await fetchJson("/api/posts", { method: "POST", body: form });
+    els.postForm.reset();
+    els.postDate.value = new Date().toISOString().slice(0, 10);
+    showMessage(els.postFormMessage, "캡처와 등록이 완료되었습니다.", "success");
+    await loadPosts();
+  } catch (error) {
+    showMessage(els.postFormMessage, error.message || "게시글 등록에 실패했습니다.", "error");
+  } finally {
+    els.postSubmitButton.disabled = false;
+    els.postSubmitButton.textContent = originalLabel;
+  }
+}
+
+async function onRefresh() {
+  hideMessage(els.userFormMessage);
+  hideMessage(els.postFormMessage);
+  await loadApp();
 }
 
 async function fetchJson(url, options = {}) {
-  const init = { ...options, headers: { ...(options.body instanceof FormData ? {} : { "content-type": "application/json" }), ...(options.headers || {}) } };
+  const init = {
+    ...options,
+    headers: {
+      ...(options.body instanceof FormData ? {} : { "content-type": "application/json" }),
+      ...(options.headers || {})
+    }
+  };
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "요청에 실패했습니다.");
+  if (!response.ok) throw new Error(data.error || "요청이 실패했습니다.");
   return data;
+}
+
+function showMessage(element, message, kind) {
+  element.hidden = false;
+  element.textContent = message;
+  element.dataset.kind = kind;
+}
+
+function hideMessage(element) {
+  element.hidden = true;
+  element.textContent = "";
+  element.dataset.kind = "";
 }
 
 function formatDate(value) {
@@ -250,11 +331,11 @@ function formatDate(value) {
 }
 
 function buildRecheckText(post) {
-  if (!post.recheck_enabled) return "24시간 리체크: 사용 안 함";
+  if (!post.recheck_enabled) return "22시간 재체크 사용 안 함";
   const due = post.recheck_due_at ? formatDateTime(post.recheck_due_at) : "-";
   const checked = post.recheck_checked_at ? formatDateTime(post.recheck_checked_at) : "-";
   const suffix = post.recheck_error ? ` · 오류: ${post.recheck_error}` : "";
-  return `24시간 리체크: ${post.recheck_status} · 예정 ${due} · 실행 ${checked}${suffix}`;
+  return `22시간 재체크 상태: ${post.recheck_status} · 예정 ${due} · 실행 ${checked}${suffix}`;
 }
 
 function formatDateTime(value) {
