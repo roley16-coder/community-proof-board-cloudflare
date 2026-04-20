@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Community Proof Board</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">Cloudflare MVP</p>
+        <h1>게시 인증 보드</h1>
+      </div>
+      <div class="topbar-actions">
+        <div id="sessionInfo" class="session-info" hidden></div>
+        <button id="logoutButton" class="ghost-button" hidden>로그아웃</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <aside class="sidebar">
+        <section id="bootstrapCard" class="panel" hidden>
+          <div class="section-head">
+            <h2>최초 관리자 생성</h2>
+            <p>처음 한 번만 관리자 계정을 만듭니다.</p>
+          </div>
+          <form id="bootstrapForm" class="stack-form">
+            <label><span>아이디</span><input id="bootstrapUsername" required></label>
+            <label><span>표시 이름</span><input id="bootstrapDisplayName" required></label>
+            <label><span>비밀번호</span><input id="bootstrapPassword" type="password" required></label>
+            <button class="primary-button" type="submit">관리자 만들기</button>
+          </form>
+        </section>
+
+        <section id="loginCard" class="panel" hidden>
+          <div class="section-head">
+            <h2>로그인</h2>
+            <p>관리자 또는 일반 계정으로 로그인합니다.</p>
+          </div>
+          <form id="loginForm" class="stack-form">
+            <label><span>아이디</span><input id="loginUsername" required></label>
+            <label><span>비밀번호</span><input id="loginPassword" type="password" required></label>
+            <button class="primary-button" type="submit">로그인</button>
+          </form>
+        </section>
+
+        <section id="adminUserCard" class="panel" hidden>
+          <div class="section-head">
+            <h2>사용자 생성</h2>
+            <p>관리자가 3~4개 계정을 가볍게 관리하는 용도입니다.</p>
+          </div>
+          <form id="userForm" class="stack-form">
+            <label><span>아이디</span><input id="newUsername" required></label>
+            <label><span>표시 이름</span><input id="newDisplayName" required></label>
+            <label><span>비밀번호</span><input id="newPassword" type="password" required></label>
+            <label>
+              <span>권한</span>
+              <select id="newRole">
+                <option value="viewer" selected>viewer</option>
+                <option value="admin">admin</option>
+              </select>
+            </label>
+            <button class="primary-button" type="submit">사용자 만들기</button>
+          </form>
+          <div id="userList" class="user-list"></div>
+        </section>
+
+        <section id="adminPostCard" class="panel" hidden>
+          <div class="section-head">
+            <h2>게시글 등록</h2>
+            <p>대상 계정을 지정해서 등록합니다.</p>
+          </div>
+          <form id="postForm" class="stack-form">
+            <label>
+              <span>보여줄 계정</span>
+              <select id="assignedUserId" required></select>
+            </label>
+            <label><span>제목</span><input id="postTitle"></label>
+            <label><span>내용</span><textarea id="postContent" rows="4"></textarea></label>
+            <div class="form-grid">
+              <label><span>날짜</span><input id="postDate" type="date" required></label>
+              <label><span>위치</span><input id="postLocation" placeholder="예: 디시 / 네이버 카페" required></label>
+            </div>
+            <label><span>원본 링크</span><input id="postSourceUrl" type="url" placeholder="https://example.com/post/123"></label>
+            <label class="checkline">
+              <input id="postEnableRecheck" type="checkbox">
+              <span>22시간 뒤 자동 재캡처 요청</span>
+            </label>
+            <label>
+              <span>이미지</span>
+              <input id="postImages" type="file" multiple accept="image/*">
+              <small>최대 30장</small>
+            </label>
+            <button class="primary-button" type="submit">게시글 저장</button>
+          </form>
+        </section>
+      </aside>
+
+      <section class="content">
+        <section class="panel">
+          <div class="section-head row">
+            <div>
+              <h2>게시글 목록</h2>
+              <p id="roleMessage">로그인 상태를 확인하는 중입니다.</p>
+            </div>
+            <button id="refreshButton" class="ghost-button" hidden>새로고침</button>
+          </div>
+          <div id="posts" class="posts"></div>
+          <div id="emptyState" class="empty-state" hidden>
+            <h3>아직 등록된 게시글이 없습니다</h3>
+            <p>관리자 계정으로 첫 글을 등록해보세요.</p>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <template id="postTemplate">
+    <article class="post-card">
+      <div class="post-header">
+        <div>
+          <p class="post-location"></p>
+          <h3 class="post-title"></h3>
+        </div>
+        <p class="post-date"></p>
+      </div>
+      <p class="post-meta"></p>
+      <p class="post-recheck"></p>
+      <p class="post-source-wrap" hidden><a class="post-source" target="_blank" rel="noopener"></a></p>
+      <p class="post-content"></p>
+      <div class="post-images"></div>
+      <div class="post-actions">
+        <button type="button" class="danger-button small post-delete" hidden>삭제</button>
+      </div>
+    </article>
+  </template>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
