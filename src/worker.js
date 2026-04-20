@@ -338,11 +338,26 @@ async function captureRemoteScreenshot(url, env) {
     await page.setViewport({ width: 1920, height: 1280, deviceScaleFactor: 1 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await waitForVisibleImages(page);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
     await browser.close();
   }
+}
+
+async function waitForVisibleImages(page) {
+  await page.waitForFunction(() => {
+    const viewportHeight = window.innerHeight;
+    const visibleImages = [...document.images].filter((img) => {
+      const rect = img.getBoundingClientRect();
+      return rect.bottom > 0 && rect.top < viewportHeight && rect.width > 40 && rect.height > 40;
+    });
+
+    if (!visibleImages.length) return true;
+
+    return visibleImages.every((img) => img.complete && img.naturalWidth > 0);
+  }, { timeout: 10000 }).catch(() => null);
 }
 
 async function getSession(request, env) {
