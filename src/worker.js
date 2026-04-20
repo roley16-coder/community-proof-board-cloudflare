@@ -338,7 +338,7 @@ async function captureRemoteScreenshot(url, env) {
     await page.setViewport({ width: 1920, height: 1280, deviceScaleFactor: 1 });
     await page.goto(url, { waitUntil: "networkidle2", timeout: 120000 });
     await page.evaluate(() => window.scrollTo(0, 0));
-    await waitForVisibleImages(page);
+    await waitForPostImages(page);
     await new Promise((resolve) => setTimeout(resolve, 1500));
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
@@ -346,17 +346,11 @@ async function captureRemoteScreenshot(url, env) {
   }
 }
 
-async function waitForVisibleImages(page) {
+async function waitForPostImages(page) {
   await page.waitForFunction(() => {
-    const viewportHeight = window.innerHeight;
-    const visibleImages = [...document.images].filter((img) => {
-      const rect = img.getBoundingClientRect();
-      return rect.bottom > 0 && rect.top < viewportHeight && rect.width > 40 && rect.height > 40;
-    });
-
-    if (!visibleImages.length) return true;
-
-    return visibleImages.every((img) => img.complete && img.naturalWidth > 0);
+    const targetImages = [...document.querySelectorAll("img.maxImg, img[src*='/editor/'], img[src*='/qb_partnersaleinfo/']")];
+    if (!targetImages.length) return true;
+    return targetImages.every((img) => img.complete && img.naturalWidth > 0);
   }, { timeout: 10000 }).catch(() => null);
 }
 
