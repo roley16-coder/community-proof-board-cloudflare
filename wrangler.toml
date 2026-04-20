@@ -14,7 +14,7 @@ crons = ["0 * * * *"]
 [[d1_databases]]
 binding = "DB"
 database_name = "community-proof-board"
-database_id = "REPLACE_WITH_D1_DATABASE_ID"
+database_id = "73acbebc-0858-4489-a612-8d47922e84e0"
 
 [[r2_buckets]]
 binding = "IMAGES_BUCKET"
