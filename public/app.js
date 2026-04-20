@@ -39,10 +39,7 @@ const els = {
   roleMessage: document.getElementById("roleMessage"),
   posts: document.getElementById("posts"),
   emptyState: document.getElementById("emptyState"),
-  postTemplate: document.getElementById("postTemplate"),
-  imageModal: document.getElementById("imageModal"),
-  imageModalClose: document.getElementById("imageModalClose"),
-  imageModalContent: document.getElementById("imageModalContent")
+  postTemplate: document.getElementById("postTemplate")
 };
 
 els.postDate.value = new Date().toISOString().slice(0, 10);
@@ -172,17 +169,18 @@ function renderPosts() {
       const item = document.createElement("div");
       item.className = "post-image-card";
 
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = "image-open-button";
-        button.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
-        button.addEventListener("click", () => openImageInNewTab(image.url));
+      const link = document.createElement("a");
+      link.className = "image-open-button";
+      link.href = image.url;
+      link.target = "_blank";
+      link.rel = "noopener noreferrer";
+      link.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
 
       const meta = document.createElement("span");
       meta.className = "post-image-type";
       meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
 
-      item.appendChild(button);
+      item.appendChild(link);
       item.appendChild(meta);
       imageWrap.appendChild(item);
     });
@@ -198,13 +196,6 @@ function renderPosts() {
     }
 
     els.posts.appendChild(fragment);
-  }
-}
-
-function openImageInNewTab(src) {
-  const opened = window.open(src, "_blank", "noopener,noreferrer");
-  if (!opened) {
-    window.alert("새 탭을 열지 못했습니다. 팝업 차단을 확인해주세요.");
   }
 }
 
