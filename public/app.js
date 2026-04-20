@@ -170,24 +170,28 @@ function renderPosts() {
     fragment.querySelector(".post-content").textContent = post.content || "코멘트 없음";
 
     const imageWrap = fragment.querySelector(".post-images");
-    (post.images || []).forEach((image) => {
-      const card = document.createElement("button");
-      card.type = "button";
-      card.className = "post-image-card";
-      card.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
+    const images = post.images || [];
+    if (images.length > 0) {
+      images.forEach((image, index) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "image-open-button";
+        button.textContent = images.length === 1
+          ? "사진 보기"
+          : `사진 보기 ${index + 1}`;
+        button.addEventListener("click", () => openImageModal(image.url, post.title || "게시 캡처 이미지"));
 
-      const img = document.createElement("img");
-      img.src = image.url;
-      img.alt = post.title || "게시 캡처 이미지";
+        const meta = document.createElement("span");
+        meta.className = "post-image-type";
+        meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
 
-      const meta = document.createElement("span");
-      meta.className = "post-image-type";
-      meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
-
-      card.appendChild(img);
-      card.appendChild(meta);
-      imageWrap.appendChild(card);
-    });
+        const item = document.createElement("div");
+        item.className = "post-image-card";
+        item.appendChild(button);
+        item.appendChild(meta);
+        imageWrap.appendChild(item);
+      });
+    }
 
     const deleteButton = fragment.querySelector(".post-delete");
     if (state.session.role === "admin") {
