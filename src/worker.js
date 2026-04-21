@@ -38,6 +38,9 @@ export default {
       if (url.pathname === "/api/capture-probe" && request.method === "GET") {
         return withCors(await handleCaptureProbe(url, env));
       }
+      if (url.pathname.startsWith("/api/telegram/webhook/") && request.method === "POST") {
+        return await handleTelegramWebhook(url.pathname.split("/").pop(), request, env);
+      }
       if (url.pathname === "/api/users" && request.method === "GET") {
         return withCors(await handleListUsers(env, session));
       }
@@ -265,42 +268,19 @@ async function handleCreatePost(request, env, session) {
     return json({ error: "assignedUserId, postedDate, location, sourceUrl are required" }, { status: 400 });
   }
 
-  const assignedUser = await env.DB.prepare("SELECT id, username FROM users WHERE id = ?").bind(assignedUserId).first();
-  if (!assignedUser) return json({ error: "Assigned user not found" }, { status: 404 });
-
-  const screenshot = await captureRemoteScreenshot(sourceUrl, env);
-  const postId = crypto.randomUUID();
-  const recheckDueAt = enableRecheck ? new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString() : null;
-  const recheckStatus = enableRecheck ? "scheduled" : "none";
-
-  await env.DB.prepare(`
-    INSERT INTO posts
-      (id, assigned_user_id, title, content, posted_date, location, source_url, recheck_enabled, recheck_due_at, recheck_status, created_by_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    postId,
+  const result = await createPostRecord({
+    env,
     assignedUserId,
     title,
     content,
     postedDate,
     location,
     sourceUrl,
-    enableRecheck ? 1 : 0,
-    recheckDueAt,
-    recheckStatus,
-    session.user.id
-  ).run();
-
-  const imageId = crypto.randomUUID();
-  const objectKey = `${postId}/${imageId}.png`;
-  await env.IMAGES_BUCKET.put(objectKey, screenshot, {
-    httpMetadata: { contentType: "image/png" }
+    enableRecheck,
+    createdByUserId: session.user.id
   });
-  await env.DB.prepare(
-    "INSERT INTO post_images (id, post_id, object_key, content_type, capture_type) VALUES (?, ?, ?, 'image/png', 'initial')"
-  ).bind(imageId, postId, objectKey).run();
 
-  return json({ success: true, postId });
+  return json({ success: true, postId: result.postId });
 }
 
 async function handleDeletePost(postId, env, session) {
@@ -342,6 +322,7 @@ async function handleGetImage(imageId, env, session) {
 }
 
 async function runScheduledRechecks(env) {
+  await ensureTelegramTables(env);
   const now = new Date().toISOString();
   const { results: duePosts } = await env.DB.prepare(`
     SELECT id, source_url
@@ -368,12 +349,267 @@ async function runScheduledRechecks(env) {
           "UPDATE posts SET recheck_status = 'completed', recheck_checked_at = ?, recheck_error = NULL WHERE id = ?"
         ).bind(new Date().toISOString(), post.id)
       ]);
+      await notifyTelegramRecheck(env, post.id, screenshot);
     } catch (error) {
       await env.DB.prepare(
         "UPDATE posts SET recheck_status = 'failed', recheck_checked_at = ?, recheck_error = ? WHERE id = ?"
       ).bind(new Date().toISOString(), String(error.message || error), post.id).run();
     }
   }
+}
+
+async function createPostRecord({
+  env,
+  assignedUserId,
+  title,
+  content,
+  postedDate,
+  location,
+  sourceUrl,
+  enableRecheck,
+  createdByUserId,
+  telegramChatId = null
+}) {
+  const assignedUser = await env.DB.prepare("SELECT id, username FROM users WHERE id = ?").bind(assignedUserId).first();
+  if (!assignedUser) throw new HttpError(404, "Assigned user not found");
+
+  const screenshot = await captureRemoteScreenshot(sourceUrl, env);
+  const postId = crypto.randomUUID();
+  const recheckDueAt = enableRecheck ? new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString() : null;
+  const recheckStatus = enableRecheck ? "scheduled" : "none";
+
+  await env.DB.prepare(`
+    INSERT INTO posts
+      (id, assigned_user_id, title, content, posted_date, location, source_url, recheck_enabled, recheck_due_at, recheck_status, created_by_user_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `).bind(
+    postId,
+    assignedUserId,
+    title,
+    content,
+    postedDate,
+    location,
+    sourceUrl,
+    enableRecheck ? 1 : 0,
+    recheckDueAt,
+    recheckStatus,
+    createdByUserId
+  ).run();
+
+  const imageId = crypto.randomUUID();
+  const objectKey = `${postId}/${imageId}.png`;
+  await env.IMAGES_BUCKET.put(objectKey, screenshot, {
+    httpMetadata: { contentType: "image/png" }
+  });
+  await env.DB.prepare(
+    "INSERT INTO post_images (id, post_id, object_key, content_type, capture_type) VALUES (?, ?, ?, 'image/png', 'initial')"
+  ).bind(imageId, postId, objectKey).run();
+
+  if (telegramChatId) {
+    await ensureTelegramTables(env);
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO telegram_post_targets (post_id, chat_id) VALUES (?, ?)"
+    ).bind(postId, String(telegramChatId)).run();
+  }
+
+  return { postId, imageId, screenshot, assignedUser };
+}
+
+async function ensureTelegramTables(env) {
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS telegram_post_targets (
+      post_id TEXT PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
+      chat_id TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+}
+
+async function handleTelegramWebhook(secret, request, env) {
+  if (!env.TELEGRAM_WEBHOOK_SECRET || secret !== env.TELEGRAM_WEBHOOK_SECRET) {
+    return json({ ok: false }, { status: 404 });
+  }
+
+  await ensureTelegramTables(env);
+  const update = await request.json().catch(() => ({}));
+  const message = update.message || update.edited_message;
+  const text = String(message?.text || "").trim();
+  const chatId = message?.chat?.id;
+
+  if (!chatId || !text) {
+    return json({ ok: true });
+  }
+
+  if (!isAllowedTelegramChat(chatId, env)) {
+    await sendTelegramText(env, chatId, "허용되지 않은 채팅입니다.");
+    return json({ ok: true });
+  }
+
+  try {
+    const parsed = parseTelegramPostMessage(text);
+    const assignedUser = await env.DB.prepare(
+      "SELECT id, username, display_name FROM users WHERE username = ?"
+    ).bind(parsed.assignedUsername).first();
+    if (!assignedUser) {
+      throw new HttpError(404, `보여줄 계정을 찾지 못했습니다: ${parsed.assignedUsername}`);
+    }
+
+    const author = await resolveTelegramAuthor(env);
+    const result = await createPostRecord({
+      env,
+      assignedUserId: assignedUser.id,
+      title: parsed.title,
+      content: parsed.content,
+      postedDate: parsed.postedDate,
+      location: parsed.location,
+      sourceUrl: parsed.sourceUrl,
+      enableRecheck: parsed.enableRecheck,
+      createdByUserId: author.id,
+      telegramChatId: chatId
+    });
+
+    await sendTelegramPhoto(env, chatId, result.screenshot, buildTelegramCaption({
+      phase: "첫 캡처",
+      title: parsed.title,
+      location: parsed.location,
+      postedDate: parsed.postedDate,
+      sourceUrl: parsed.sourceUrl
+    }));
+    await sendTelegramText(env, chatId, `등록 완료\n대상 계정: ${assignedUser.display_name} (${assignedUser.username})`);
+  } catch (error) {
+    const messageText = error instanceof HttpError
+      ? error.message
+      : "등록에 실패했습니다. 양식을 다시 확인해주세요.";
+    await sendTelegramText(env, chatId, `${messageText}\n\n${telegramMessageExample()}`);
+  }
+
+  return json({ ok: true });
+}
+
+function parseTelegramPostMessage(text) {
+  const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  const data = {};
+
+  for (const line of lines) {
+    const match = line.match(/^([^:：]+)\s*[:：]\s*(.+)$/);
+    if (!match) continue;
+    const key = match[1].trim();
+    const value = match[2].trim();
+    data[key] = value;
+  }
+
+  const assignedUsername = normalizeUsername(
+    data["보여줄 계정"] || data["계정"] || data["아이디"] || ""
+  );
+  const postedDate = String(data["날짜"] || "").trim();
+  const location = String(data["게시 위치"] || data["위치"] || "").trim();
+  const sourceUrl = String(data["원본 링크"] || data["링크"] || "").trim();
+  const title = nullableString(data["제목"] || "");
+  const content = nullableString(data["코멘트"] || data["내용"] || "");
+  const enableRecheck = parseBooleanText(data["22시간 뒤 자동 재체크"] || data["재체크"] || "");
+
+  if (!assignedUsername || !postedDate || !location || !sourceUrl) {
+    throw new HttpError(400, "필수 항목이 부족합니다.");
+  }
+
+  return { assignedUsername, postedDate, location, sourceUrl, title, content, enableRecheck };
+}
+
+function parseBooleanText(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  return ["1", "y", "yes", "true", "예", "네", "사용", "on"].includes(normalized);
+}
+
+function telegramMessageExample() {
+  return [
+    "텔레그램 등록 양식",
+    "보여줄 계정: viewer1",
+    "제목: 예시 제목",
+    "코멘트: 간단한 메모",
+    "날짜: 2026-04-21",
+    "게시 위치: FMKorea",
+    "원본 링크: https://www.fmkorea.com/9733201035",
+    "22시간 뒤 자동 재체크: 예"
+  ].join("\n");
+}
+
+async function resolveTelegramAuthor(env) {
+  const preferred = nullableString(env.TELEGRAM_CREATED_BY_USERNAME || "");
+  if (preferred) {
+    const user = await env.DB.prepare(
+      "SELECT id, username FROM users WHERE username = ?"
+    ).bind(normalizeUsername(preferred)).first();
+    if (user) return user;
+  }
+
+  const fallback = await env.DB.prepare(
+    "SELECT id, username FROM users WHERE role = 'admin' ORDER BY created_at ASC LIMIT 1"
+  ).first();
+  if (!fallback) throw new HttpError(400, "관리자 계정이 없어 텔레그램 등록을 처리할 수 없습니다.");
+  return fallback;
+}
+
+function isAllowedTelegramChat(chatId, env) {
+  const raw = String(env.TELEGRAM_ALLOWED_CHAT_IDS || "").trim();
+  if (!raw) return true;
+  const allowed = raw.split(",").map((item) => item.trim()).filter(Boolean);
+  return allowed.includes(String(chatId));
+}
+
+async function sendTelegramText(env, chatId, text) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      chat_id: chatId,
+      text
+    })
+  });
+}
+
+async function sendTelegramPhoto(env, chatId, imageBytes, caption) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  const form = new FormData();
+  form.set("chat_id", String(chatId));
+  form.set("caption", caption);
+  form.set("photo", new Blob([imageBytes], { type: "image/png" }), "capture.png");
+  await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendPhoto`, {
+    method: "POST",
+    body: form
+  });
+}
+
+function buildTelegramCaption({ phase, title, location, postedDate, sourceUrl }) {
+  return [
+    phase,
+    title ? `제목: ${title}` : null,
+    `위치: ${location}`,
+    `날짜: ${postedDate}`,
+    sourceUrl ? `링크: ${sourceUrl}` : null
+  ].filter(Boolean).join("\n");
+}
+
+async function notifyTelegramRecheck(env, postId, screenshot) {
+  if (!env.TELEGRAM_BOT_TOKEN) return;
+  await ensureTelegramTables(env);
+  const target = await env.DB.prepare(
+    "SELECT chat_id FROM telegram_post_targets WHERE post_id = ?"
+  ).bind(postId).first();
+  if (!target?.chat_id) return;
+
+  const post = await env.DB.prepare(
+    "SELECT title, location, posted_date, source_url FROM posts WHERE id = ?"
+  ).bind(postId).first();
+  if (!post) return;
+
+  await sendTelegramPhoto(env, target.chat_id, screenshot, buildTelegramCaption({
+    phase: "22시간 후 사진",
+    title: post.title,
+    location: post.location,
+    postedDate: post.posted_date,
+    sourceUrl: post.source_url
+  }));
 }
 
 async function captureRemoteScreenshot(url, env) {

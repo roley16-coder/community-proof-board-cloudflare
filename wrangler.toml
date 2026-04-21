@@ -27,5 +27,7 @@ binding = "BROWSER"
 SESSION_COOKIE_NAME = "cpb_session"
 LOCAL_CAPTURE_ENDPOINT = "https://lunch-interracial-dating-muscles.trycloudflare.com/capture"
 LOCAL_CAPTURE_HOSTS = "fmkorea.com,www.fmkorea.com"
+TELEGRAM_CREATED_BY_USERNAME = "admin1234"
+TELEGRAM_ALLOWED_CHAT_IDS = ""
 
-# Configure SESSION_SECRET in Cloudflare dashboard or with wrangler secret put.
+# Configure SESSION_SECRET, TELEGRAM_BOT_TOKEN, TELEGRAM_WEBHOOK_SECRET in Cloudflare dashboard or with wrangler secret put.
