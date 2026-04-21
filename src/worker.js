@@ -371,7 +371,7 @@ async function runScheduledRechecks(env) {
 }
 
 async function captureRemoteScreenshot(url, env) {
-  if (env.LOCAL_CAPTURE_ENDPOINT) {
+  if (shouldUseLocalCapture(url, env) && env.LOCAL_CAPTURE_ENDPOINT) {
     const localCapture = await tryLocalCapture(url, env);
     if (localCapture) return localCapture;
   }
@@ -389,6 +389,19 @@ async function captureRemoteScreenshot(url, env) {
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
     await browser.close();
+  }
+}
+
+function shouldUseLocalCapture(url, env) {
+  try {
+    const hostname = new URL(url).hostname.toLowerCase();
+    const localCaptureHosts = String(env.LOCAL_CAPTURE_HOSTS || "fmkorea.com,www.fmkorea.com")
+      .split(",")
+      .map((item) => item.trim().toLowerCase())
+      .filter(Boolean);
+    return localCaptureHosts.includes(hostname);
+  } catch (_) {
+    return false;
   }
 }
 
