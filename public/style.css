@@ -231,6 +231,8 @@ textarea {
   display: inline-flex;
   justify-content: center;
   align-items: center;
+  font-size: 0.94rem;
+  font-weight: 700;
 }
 
 .primary-button {
@@ -245,14 +247,20 @@ textarea {
   color: var(--ink);
 }
 
+.image-action-link {
+  background: rgba(200, 100, 47, 0.14);
+  color: #9f4b20;
+  border: 1px solid rgba(200, 100, 47, 0.16);
+}
+
 .danger-button {
   background: rgba(170, 62, 53, 0.12);
   color: var(--danger);
 }
 
 .small {
-  padding: 9px 12px;
-  font-size: 0.88rem;
+  padding: 10px 12px;
+  font-size: 0.94rem;
 }
 
 .form-message {
@@ -374,6 +382,7 @@ textarea {
 
 .post-links > * {
   width: 100%;
+  min-height: 42px;
 }
 
 .post-actions {
