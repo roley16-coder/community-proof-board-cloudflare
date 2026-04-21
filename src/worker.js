@@ -32,6 +32,9 @@ export default {
       if (url.pathname === "/api/session" && request.method === "GET") {
         return withCors(await handleSession(env, session));
       }
+      if (url.pathname === "/api/version" && request.method === "GET") {
+        return withCors(handleVersion(env));
+      }
       if (url.pathname === "/api/users" && request.method === "GET") {
         return withCors(await handleListUsers(env, session));
       }
@@ -403,6 +406,14 @@ function shouldUseLocalCapture(url, env) {
   } catch (_) {
     return false;
   }
+}
+
+function handleVersion(env) {
+  return json({
+    version: "2026-04-21-fmkorea-local-capture",
+    localCaptureEndpointConfigured: Boolean(env.LOCAL_CAPTURE_ENDPOINT),
+    localCaptureHosts: String(env.LOCAL_CAPTURE_HOSTS || "")
+  });
 }
 
 async function tryLocalCapture(url, env) {
