@@ -25,8 +25,7 @@ binding = "BROWSER"
 
 [vars]
 SESSION_COOKIE_NAME = "cpb_session"
-LOCAL_CAPTURE_ENDPOINT = "https://facilitate-lasting-row-targets.trycloudflare.com/capture"
-LOCAL_CAPTURE_TOKEN = "cpb_local_token_20260421"
+LOCAL_CAPTURE_ENDPOINT = "https://lunch-interracial-dating-muscles.trycloudflare.com/capture"
 LOCAL_CAPTURE_HOSTS = "fmkorea.com,www.fmkorea.com"
 
 # Configure SESSION_SECRET in Cloudflare dashboard or with wrangler secret put.
