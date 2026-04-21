@@ -412,7 +412,8 @@ function handleVersion(env) {
   return json({
     version: "2026-04-21-fmkorea-local-capture",
     localCaptureEndpointConfigured: Boolean(env.LOCAL_CAPTURE_ENDPOINT),
-    localCaptureHosts: String(env.LOCAL_CAPTURE_HOSTS || "")
+    localCaptureHosts: String(env.LOCAL_CAPTURE_HOSTS || ""),
+    localCaptureEndpoint: String(env.LOCAL_CAPTURE_ENDPOINT || "")
   });
 }
 
