@@ -192,14 +192,23 @@ function renderPosts() {
     sourceLink.textContent = "원본 링크";
     sourceLink.hidden = !post.source_url;
 
-    const imageLink = fragment.querySelector(".post-image-link");
+    const initialImageLink = fragment.querySelector(".post-initial-image-link");
+    const recheckImageLink = fragment.querySelector(".post-recheck-image-link");
     const initialImage = (post.images || []).find((image) => image.capture_type === "initial") || post.images?.[0];
+    const recheckImage = (post.images || []).find((image) => image.capture_type === "recheck");
+
     if (initialImage) {
-      imageLink.href = initialImage.url;
-      imageLink.textContent = "사진 보기";
-      imageLink.hidden = false;
+      initialImageLink.href = initialImage.url;
+      initialImageLink.hidden = false;
     } else {
-      imageLink.hidden = true;
+      initialImageLink.hidden = true;
+    }
+
+    if (recheckImage) {
+      recheckImageLink.href = recheckImage.url;
+      recheckImageLink.hidden = false;
+    } else {
+      recheckImageLink.hidden = true;
     }
 
     const copyButton = fragment.querySelector(".post-copy");
