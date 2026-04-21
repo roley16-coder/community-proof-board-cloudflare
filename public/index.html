@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Community Proof Board</title>
+  <title>게시 인증 보드</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -19,8 +19,8 @@
       </div>
     </header>
 
-    <main class="workspace">
-      <aside class="sidebar">
+    <main class="layout">
+      <section class="side-column">
         <section id="bootstrapCard" class="panel" hidden>
           <div class="section-head">
             <h2>최초 관리자 생성</h2>
@@ -37,7 +37,7 @@
         <section id="loginCard" class="panel" hidden>
           <div class="section-head">
             <h2>로그인</h2>
-            <p>관리자 또는 조회 전용 계정으로 로그인합니다.</p>
+            <p>관리자 또는 조회 계정으로 로그인합니다.</p>
           </div>
           <form id="loginForm" class="stack-form">
             <label><span>아이디</span><input id="loginUsername" required></label>
@@ -46,89 +46,139 @@
           </form>
         </section>
 
-        <section id="adminUserCard" class="panel" hidden>
+        <section id="adminMenuCard" class="panel admin-menu" hidden>
           <div class="section-head">
-            <h2>사용자 계정 생성</h2>
-            <p>관리자가 조회 전용 계정과 관리자 계정을 관리합니다.</p>
+            <h2>관리 메뉴</h2>
+            <p>필요할 때만 열어서 계정과 게시글을 등록할 수 있습니다.</p>
           </div>
-          <p id="userFormMessage" class="form-message" hidden></p>
-          <form id="userForm" class="stack-form">
-            <label><span>아이디</span><input id="newUsername" required></label>
-            <label><span>표시 이름</span><input id="newDisplayName" required></label>
-            <label><span>비밀번호</span><input id="newPassword" type="password" required></label>
-            <label>
-              <span>권한</span>
-              <select id="newRole">
-                <option value="viewer" selected>viewer</option>
-                <option value="admin">admin</option>
-              </select>
-            </label>
-            <button class="primary-button" type="submit">사용자 만들기</button>
-          </form>
-          <div id="userList" class="user-list"></div>
-        </section>
-
-        <section id="adminPostCard" class="panel" hidden>
-          <div class="section-head">
-            <h2>게시글 등록</h2>
-            <p>링크를 입력하면 페이지에 접속해 자동으로 캡처한 뒤 저장합니다.</p>
+          <div class="admin-actions">
+            <button id="openUserModalButton" class="primary-button" type="button">사용자 계정 생성</button>
+            <button id="openPostModalButton" class="ghost-button" type="button">게시글 등록</button>
           </div>
-          <p id="postFormMessage" class="form-message" hidden></p>
-          <form id="postForm" class="stack-form">
-            <label>
-              <span>보여줄 계정</span>
-              <select id="assignedUserId" required></select>
-            </label>
-            <label><span>제목</span><input id="postTitle"></label>
-            <label><span>코멘트</span><textarea id="postContent" rows="4"></textarea></label>
-            <div class="form-grid">
-              <label><span>날짜</span><input id="postDate" type="date" required></label>
-              <label><span>게시 위치</span><input id="postLocation" placeholder="예: 디시인사이드 / 네이버 카페" required></label>
+          <div class="admin-users">
+            <div class="admin-users-head">
+              <h3>계정 목록</h3>
+              <span id="userCount" class="count-badge">0명</span>
             </div>
-            <label><span>원본 링크</span><input id="postSourceUrl" type="url" placeholder="https://example.com/post/123" required></label>
-            <label class="checkline">
-              <input id="postEnableRecheck" type="checkbox">
-              <span>22시간 뒤 자동 재체크 요청</span>
-            </label>
-            <p class="helper-text">목록에서는 사진이 바로 보이지 않고, 사진 보기 링크를 누르면 새 탭에서 크게 열립니다.</p>
-            <button id="postSubmitButton" class="primary-button" type="submit">게시글 등록</button>
-          </form>
+            <div id="userList" class="user-list"></div>
+          </div>
         </section>
-      </aside>
+      </section>
 
-      <section class="content">
+      <section class="main-column">
         <section class="panel">
-          <div class="section-head row">
+          <div class="content-toolbar">
             <div>
               <h2>게시글 목록</h2>
               <p id="roleMessage">로그인 상태를 확인하는 중입니다.</p>
             </div>
-            <button id="refreshButton" class="ghost-button" hidden>새로고침</button>
+            <div class="toolbar-actions">
+              <label class="filter-select">
+                <span>정렬</span>
+                <select id="sortFilter">
+                  <option value="posted-desc">날짜순으로 보기</option>
+                  <option value="created-desc">최신순으로 보기</option>
+                  <option value="created-asc">오래된순으로 보기</option>
+                </select>
+              </label>
+              <button id="refreshButton" class="ghost-button" hidden>새로고침</button>
+            </div>
           </div>
-          <div id="posts" class="posts"></div>
+
+          <div id="posts" class="post-grid"></div>
+
           <div id="emptyState" class="empty-state" hidden>
             <h3>아직 등록된 게시글이 없습니다</h3>
-            <p>관리자 계정으로 첫 게시글을 등록해보세요.</p>
+            <p>관리자 계정으로 게시글을 등록하면 이 영역에 카드가 표시됩니다.</p>
+          </div>
+
+          <div id="pagination" class="pagination" hidden>
+            <button id="prevPageButton" class="ghost-button" type="button">이전</button>
+            <span id="pageInfo" class="page-info"></span>
+            <button id="nextPageButton" class="ghost-button" type="button">다음</button>
           </div>
         </section>
       </section>
     </main>
   </div>
 
+  <div id="modalBackdrop" class="modal-backdrop" hidden></div>
+
+  <section id="userModal" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="userModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h2 id="userModalTitle">사용자 계정 생성</h2>
+        </div>
+        <button class="modal-close ghost-button" type="button" data-close-modal="userModal">닫기</button>
+      </div>
+      <p id="userFormMessage" class="form-message" hidden></p>
+      <form id="userForm" class="stack-form">
+        <label><span>아이디</span><input id="newUsername" required></label>
+        <label><span>표시 이름</span><input id="newDisplayName" required></label>
+        <label><span>비밀번호</span><input id="newPassword" type="password" required></label>
+        <label>
+          <span>권한</span>
+          <select id="newRole">
+            <option value="viewer" selected>viewer</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+        <button class="primary-button" type="submit">사용자 만들기</button>
+      </form>
+    </div>
+  </section>
+
+  <section id="postModal" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="postModalTitle">
+    <div class="modal-card modal-card-wide">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Admin</p>
+          <h2 id="postModalTitle">게시글 등록</h2>
+        </div>
+        <button class="modal-close ghost-button" type="button" data-close-modal="postModal">닫기</button>
+      </div>
+      <p class="helper-text">원본 링크를 입력하면 해당 페이지에 접속해 자동으로 캡처한 뒤 저장합니다.</p>
+      <p id="postFormMessage" class="form-message" hidden></p>
+      <form id="postForm" class="stack-form">
+        <label>
+          <span>보여줄 계정</span>
+          <select id="assignedUserId" required></select>
+        </label>
+        <div class="form-grid">
+          <label><span>제목</span><input id="postTitle"></label>
+          <label><span>게시 위치</span><input id="postLocation" placeholder="예: 퀘이사존 / 디시인사이드" required></label>
+        </div>
+        <label><span>코멘트</span><textarea id="postContent" rows="4"></textarea></label>
+        <div class="form-grid">
+          <label><span>날짜</span><input id="postDate" type="date" required></label>
+          <label><span>원본 링크</span><input id="postSourceUrl" type="url" placeholder="https://example.com/post/123" required></label>
+        </div>
+        <label class="checkline">
+          <input id="postEnableRecheck" type="checkbox">
+          <span>22시간 뒤 자동 재체크 요청</span>
+        </label>
+        <button id="postSubmitButton" class="primary-button" type="submit">게시글 등록</button>
+      </form>
+    </div>
+  </section>
+
   <template id="postTemplate">
     <article class="post-card">
-      <div class="post-header">
-        <div>
-          <p class="post-location"></p>
-          <h3 class="post-title"></h3>
-        </div>
+      <div class="post-card-top">
+        <p class="post-location"></p>
         <p class="post-date"></p>
       </div>
+      <h3 class="post-title"></h3>
       <p class="post-meta"></p>
-      <p class="post-recheck"></p>
-      <p class="post-source-wrap" hidden><a class="post-source" target="_blank" rel="noopener"></a></p>
       <p class="post-content"></p>
-      <div class="post-images"></div>
+      <p class="post-recheck"></p>
+      <div class="post-links">
+        <a class="action-link post-source" target="_blank" rel="noopener">원본 링크</a>
+        <a class="action-link post-image-link" target="_blank" rel="noopener">사진 보기</a>
+        <button class="ghost-button small post-copy" type="button">내용 복사</button>
+      </div>
       <div class="post-actions">
         <button type="button" class="danger-button small post-delete" hidden>삭제</button>
       </div>

@@ -1,7 +1,11 @@
+const PAGE_SIZE = 10;
+
 const state = {
   session: null,
   users: [],
-  posts: []
+  posts: [],
+  sort: "posted-desc",
+  page: 1
 };
 
 const els = {
@@ -16,15 +20,20 @@ const els = {
   loginPassword: document.getElementById("loginPassword"),
   sessionInfo: document.getElementById("sessionInfo"),
   logoutButton: document.getElementById("logoutButton"),
-  adminUserCard: document.getElementById("adminUserCard"),
+  adminMenuCard: document.getElementById("adminMenuCard"),
+  openUserModalButton: document.getElementById("openUserModalButton"),
+  openPostModalButton: document.getElementById("openPostModalButton"),
+  modalBackdrop: document.getElementById("modalBackdrop"),
+  userModal: document.getElementById("userModal"),
+  postModal: document.getElementById("postModal"),
   userForm: document.getElementById("userForm"),
   userFormMessage: document.getElementById("userFormMessage"),
   newUsername: document.getElementById("newUsername"),
   newDisplayName: document.getElementById("newDisplayName"),
   newPassword: document.getElementById("newPassword"),
   newRole: document.getElementById("newRole"),
+  userCount: document.getElementById("userCount"),
   userList: document.getElementById("userList"),
-  adminPostCard: document.getElementById("adminPostCard"),
   postForm: document.getElementById("postForm"),
   postFormMessage: document.getElementById("postFormMessage"),
   assignedUserId: document.getElementById("assignedUserId"),
@@ -36,9 +45,14 @@ const els = {
   postEnableRecheck: document.getElementById("postEnableRecheck"),
   postSubmitButton: document.getElementById("postSubmitButton"),
   refreshButton: document.getElementById("refreshButton"),
+  sortFilter: document.getElementById("sortFilter"),
   roleMessage: document.getElementById("roleMessage"),
   posts: document.getElementById("posts"),
   emptyState: document.getElementById("emptyState"),
+  pagination: document.getElementById("pagination"),
+  prevPageButton: document.getElementById("prevPageButton"),
+  nextPageButton: document.getElementById("nextPageButton"),
+  pageInfo: document.getElementById("pageInfo"),
   postTemplate: document.getElementById("postTemplate")
 };
 
@@ -50,6 +64,18 @@ els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
 els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
+els.sortFilter.addEventListener("change", onChangeSort);
+els.prevPageButton.addEventListener("click", () => changePage(-1));
+els.nextPageButton.addEventListener("click", () => changePage(1));
+els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
+els.openPostModalButton.addEventListener("click", () => openModal("postModal"));
+els.modalBackdrop.addEventListener("click", closeAllModals);
+document.querySelectorAll("[data-close-modal]").forEach((button) => {
+  button.addEventListener("click", closeAllModals);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeAllModals();
+});
 
 await loadApp();
 
@@ -59,14 +85,7 @@ async function loadApp() {
     state.session = sessionRes.user;
 
     if (!state.session) {
-      showLoggedOut();
-      if (sessionRes.bootstrapNeeded) {
-        els.bootstrapCard.hidden = false;
-        els.loginCard.hidden = true;
-      } else {
-        els.bootstrapCard.hidden = true;
-        els.loginCard.hidden = false;
-      }
+      showLoggedOut(sessionRes.bootstrapNeeded);
       return;
     }
 
@@ -78,19 +97,24 @@ async function loadApp() {
   }
 }
 
-function showLoggedOut() {
+function showLoggedOut(bootstrapNeeded) {
+  state.users = [];
+  state.posts = [];
+  closeAllModals();
   els.sessionInfo.hidden = true;
   els.logoutButton.hidden = true;
-  els.adminUserCard.hidden = true;
-  els.adminPostCard.hidden = true;
+  els.adminMenuCard.hidden = true;
   els.refreshButton.hidden = true;
-  els.loginCard.hidden = false;
+  els.bootstrapCard.hidden = !bootstrapNeeded;
+  els.loginCard.hidden = bootstrapNeeded;
   els.roleMessage.textContent = "로그인 후 게시글 목록을 확인할 수 있습니다.";
   els.posts.innerHTML = "";
   els.emptyState.hidden = false;
+  els.pagination.hidden = true;
 }
 
 function showLoggedIn() {
+  closeAllModals();
   els.bootstrapCard.hidden = true;
   els.loginCard.hidden = true;
   els.sessionInfo.hidden = false;
@@ -99,11 +123,10 @@ function showLoggedIn() {
   els.sessionInfo.textContent = `${state.session.display_name} (${state.session.username}) · ${state.session.role}`;
 
   const isAdmin = state.session.role === "admin";
-  els.adminUserCard.hidden = !isAdmin;
-  els.adminPostCard.hidden = !isAdmin;
+  els.adminMenuCard.hidden = !isAdmin;
   els.roleMessage.textContent = isAdmin
-    ? "관리자는 전체 게시글을 보고 사용자 계정과 게시글을 관리할 수 있습니다."
-    : "현재 계정에 배정된 게시글만 표시됩니다.";
+    ? "전체 게시글을 보고 계정과 게시글을 관리할 수 있습니다."
+    : "배정된 게시글만 조회할 수 있습니다. 새로고침, 내용 복사, 원본 링크 이동, 사진 보기가 가능합니다.";
 }
 
 async function loadUsersIfAdmin() {
@@ -111,14 +134,15 @@ async function loadUsersIfAdmin() {
 
   const res = await fetchJson("/api/users");
   state.users = res.users || [];
+  els.userCount.textContent = `${state.users.length}명`;
   els.userList.innerHTML = "";
   els.assignedUserId.innerHTML = "";
 
   for (const user of state.users) {
-    const article = document.createElement("article");
-    article.className = "user-item";
-    article.innerHTML = `<strong>${escapeHtml(user.display_name)}</strong><span>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</span>`;
-    els.userList.appendChild(article);
+    const item = document.createElement("article");
+    item.className = "user-item";
+    item.innerHTML = `<strong>${escapeHtml(user.display_name)}</strong><span>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</span>`;
+    els.userList.appendChild(item);
 
     const option = document.createElement("option");
     option.value = user.id;
@@ -126,10 +150,8 @@ async function loadUsersIfAdmin() {
     els.assignedUserId.appendChild(option);
   }
 
-  const hasUsers = state.users.length > 0;
-  els.postSubmitButton.disabled = !hasUsers;
-
-  if (!hasUsers) {
+  els.postSubmitButton.disabled = state.users.length === 0;
+  if (state.users.length === 0) {
     showMessage(els.postFormMessage, "먼저 보여줄 사용자 계정을 하나 이상 만들어주세요.", "error");
   } else if (els.postFormMessage.textContent.includes("먼저 보여줄 사용자")) {
     hideMessage(els.postFormMessage);
@@ -139,57 +161,72 @@ async function loadUsersIfAdmin() {
 async function loadPosts() {
   const res = await fetchJson("/api/posts");
   state.posts = res.posts || [];
+  clampPage();
   renderPosts();
 }
 
 function renderPosts() {
+  const sortedPosts = sortPosts(state.posts, state.sort);
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / PAGE_SIZE));
+  const start = (state.page - 1) * PAGE_SIZE;
+  const pagePosts = sortedPosts.slice(start, start + PAGE_SIZE);
+
   els.posts.innerHTML = "";
-  els.emptyState.hidden = state.posts.length > 0;
+  els.emptyState.hidden = sortedPosts.length > 0;
+  els.pagination.hidden = sortedPosts.length <= PAGE_SIZE;
+  els.pageInfo.textContent = `${state.page} / ${totalPages}`;
+  els.prevPageButton.disabled = state.page === 1;
+  els.nextPageButton.disabled = state.page === totalPages;
 
-  for (const post of state.posts) {
+  for (const post of pagePosts) {
     const fragment = els.postTemplate.content.cloneNode(true);
-    fragment.querySelector(".post-location").textContent = post.location;
-    fragment.querySelector(".post-title").textContent = post.title || "제목 없음";
+    fragment.querySelector(".post-location").textContent = post.location || "위치 미입력";
     fragment.querySelector(".post-date").textContent = formatDate(post.posted_date);
-    fragment.querySelector(".post-meta").textContent = `대상 계정: ${post.assigned_username} · 등록자: ${post.created_by_username}`;
-    fragment.querySelector(".post-recheck").textContent = buildRecheckText(post);
+    fragment.querySelector(".post-title").textContent = post.title || "제목 없음";
+    fragment.querySelector(".post-meta").textContent = `대상: ${post.assigned_username} · 등록자: ${post.created_by_username}`;
     fragment.querySelector(".post-content").textContent = post.content || "코멘트 없음";
+    fragment.querySelector(".post-recheck").textContent = buildRecheckText(post);
 
-    const sourceWrap = fragment.querySelector(".post-source-wrap");
     const sourceLink = fragment.querySelector(".post-source");
-    if (post.source_url) {
-      sourceWrap.hidden = false;
-      sourceLink.href = post.source_url;
-      sourceLink.textContent = post.source_url;
+    sourceLink.href = post.source_url || "#";
+    sourceLink.textContent = "원본 링크";
+    sourceLink.hidden = !post.source_url;
+
+    const imageLink = fragment.querySelector(".post-image-link");
+    const initialImage = (post.images || []).find((image) => image.capture_type === "initial") || post.images?.[0];
+    if (initialImage) {
+      imageLink.href = initialImage.url;
+      imageLink.textContent = "사진 보기";
+      imageLink.hidden = false;
+    } else {
+      imageLink.hidden = true;
     }
 
-    const imageWrap = fragment.querySelector(".post-images");
-    const images = post.images || [];
-    images.forEach((image, index) => {
-      const item = document.createElement("div");
-      item.className = "post-image-card";
+    const copyButton = fragment.querySelector(".post-copy");
+    copyButton.addEventListener("click", async () => {
+      const textToCopy = [
+        post.title || "",
+        post.content || "",
+        post.location || "",
+        post.source_url || ""
+      ].filter(Boolean).join("\n");
 
-      const link = document.createElement("a");
-      link.className = "image-open-button";
-      link.href = image.url;
-      link.target = "_blank";
-      link.rel = "noopener noreferrer";
-      link.textContent = images.length === 1 ? "사진 보기" : `사진 보기 ${index + 1}`;
-
-      const meta = document.createElement("span");
-      meta.className = "post-image-type";
-      meta.textContent = image.capture_type === "recheck" ? "22시간 재체크 캡처" : "초기 등록 캡처";
-
-      item.appendChild(link);
-      item.appendChild(meta);
-      imageWrap.appendChild(item);
+      try {
+        await navigator.clipboard.writeText(textToCopy);
+        copyButton.textContent = "복사 완료";
+        window.setTimeout(() => {
+          copyButton.textContent = "내용 복사";
+        }, 1400);
+      } catch (error) {
+        window.alert("복사에 실패했습니다.");
+      }
     });
 
     const deleteButton = fragment.querySelector(".post-delete");
     if (state.session.role === "admin") {
       deleteButton.hidden = false;
       deleteButton.addEventListener("click", async () => {
-        if (!window.confirm("게시글을 삭제할까요?")) return;
+        if (!window.confirm("이 게시글을 삭제할까요?")) return;
         await fetchJson(`/api/posts/${post.id}`, { method: "DELETE" });
         await loadPosts();
       });
@@ -264,6 +301,10 @@ async function onCreateUser(event) {
     els.newRole.value = "viewer";
     showMessage(els.userFormMessage, "사용자 계정을 만들었습니다.", "success");
     await loadUsersIfAdmin();
+    window.setTimeout(() => {
+      closeAllModals();
+      hideMessage(els.userFormMessage);
+    }, 500);
   } catch (error) {
     showMessage(els.userFormMessage, error.message || "사용자 계정을 만들지 못했습니다.", "error");
   }
@@ -290,8 +331,12 @@ async function onCreatePost(event) {
     await fetchJson("/api/posts", { method: "POST", body: form });
     els.postForm.reset();
     els.postDate.value = new Date().toISOString().slice(0, 10);
-    showMessage(els.postFormMessage, "캡처와 등록이 완료되었습니다.", "success");
+    showMessage(els.postFormMessage, "게시글 등록과 캡처 저장이 완료되었습니다.", "success");
     await loadPosts();
+    window.setTimeout(() => {
+      closeAllModals();
+      hideMessage(els.postFormMessage);
+    }, 500);
   } catch (error) {
     showMessage(els.postFormMessage, error.message || "게시글 등록에 실패했습니다.", "error");
   } finally {
@@ -306,6 +351,53 @@ async function onRefresh() {
   await loadApp();
 }
 
+function onChangeSort() {
+  state.sort = els.sortFilter.value;
+  state.page = 1;
+  renderPosts();
+}
+
+function changePage(delta) {
+  state.page += delta;
+  clampPage();
+  renderPosts();
+}
+
+function clampPage() {
+  const totalPages = Math.max(1, Math.ceil(state.posts.length / PAGE_SIZE));
+  state.page = Math.min(Math.max(1, state.page), totalPages);
+}
+
+function sortPosts(posts, sort) {
+  const copied = [...posts];
+  const time = (value) => new Date(value || 0).getTime();
+
+  if (sort === "created-desc") {
+    return copied.sort((a, b) => time(b.created_at) - time(a.created_at));
+  }
+  if (sort === "created-asc") {
+    return copied.sort((a, b) => time(a.created_at) - time(b.created_at));
+  }
+  return copied.sort((a, b) => {
+    const postedDiff = time(b.posted_date) - time(a.posted_date);
+    if (postedDiff !== 0) return postedDiff;
+    return time(b.created_at) - time(a.created_at);
+  });
+}
+
+function openModal(id) {
+  els.modalBackdrop.hidden = false;
+  els[id].hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeAllModals() {
+  els.modalBackdrop.hidden = true;
+  els.userModal.hidden = true;
+  els.postModal.hidden = true;
+  document.body.classList.remove("modal-open");
+}
+
 async function fetchJson(url, options = {}) {
   const init = {
     ...options,
@@ -317,7 +409,7 @@ async function fetchJson(url, options = {}) {
 
   const response = await fetch(url, init);
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "요청이 실패했습니다.");
+  if (!response.ok) throw new Error(data.error || "요청에 실패했습니다.");
   return data;
 }
 
@@ -337,16 +429,16 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("ko-KR", { dateStyle: "long" }).format(new Date(value));
 }
 
+function formatDateTime(value) {
+  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
 function buildRecheckText(post) {
   if (!post.recheck_enabled) return "22시간 재체크 사용 안 함";
   const due = post.recheck_due_at ? formatDateTime(post.recheck_due_at) : "-";
   const checked = post.recheck_checked_at ? formatDateTime(post.recheck_checked_at) : "-";
   const suffix = post.recheck_error ? ` · 오류: ${post.recheck_error}` : "";
-  return `22시간 재체크 상태: ${post.recheck_status} · 예정 ${due} · 실행 ${checked}${suffix}`;
-}
-
-function formatDateTime(value) {
-  return new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+  return `22시간 재체크: ${post.recheck_status} · 예정 ${due} · 실행 ${checked}${suffix}`;
 }
 
 function escapeHtml(value) {
