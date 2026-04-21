@@ -35,6 +35,9 @@ export default {
       if (url.pathname === "/api/version" && request.method === "GET") {
         return withCors(handleVersion(env));
       }
+      if (url.pathname === "/api/capture-probe" && request.method === "GET") {
+        return withCors(await handleCaptureProbe(url, env));
+      }
       if (url.pathname === "/api/users" && request.method === "GET") {
         return withCors(await handleListUsers(env, session));
       }
@@ -414,6 +417,64 @@ function handleVersion(env) {
     localCaptureEndpointConfigured: Boolean(env.LOCAL_CAPTURE_ENDPOINT),
     localCaptureHosts: String(env.LOCAL_CAPTURE_HOSTS || ""),
     localCaptureEndpoint: String(env.LOCAL_CAPTURE_ENDPOINT || "")
+  });
+}
+
+async function handleCaptureProbe(url, env) {
+  const target = url.searchParams.get("target") || "https://www.fmkorea.com/9733201035";
+  const shouldLocal = shouldUseLocalCapture(target, env);
+  let localHealth = null;
+  let localCapture = null;
+
+  if (env.LOCAL_CAPTURE_ENDPOINT) {
+    try {
+      const healthUrl = env.LOCAL_CAPTURE_ENDPOINT.replace(/\/capture$/, "/health");
+      const healthRes = await fetch(healthUrl);
+      localHealth = {
+        ok: healthRes.ok,
+        status: healthRes.status,
+        body: await healthRes.text()
+      };
+    } catch (error) {
+      localHealth = {
+        ok: false,
+        error: String(error.message || error)
+      };
+    }
+
+    if (shouldLocal) {
+      try {
+        const captureRes = await fetch(env.LOCAL_CAPTURE_ENDPOINT, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            ...(env.LOCAL_CAPTURE_TOKEN ? { "x-capture-token": env.LOCAL_CAPTURE_TOKEN } : {})
+          },
+          body: JSON.stringify({ url: target })
+        });
+        const body = await captureRes.arrayBuffer();
+        localCapture = {
+          ok: captureRes.ok,
+          status: captureRes.status,
+          byteLength: body.byteLength,
+          contentType: captureRes.headers.get("content-type") || ""
+        };
+      } catch (error) {
+        localCapture = {
+          ok: false,
+          error: String(error.message || error)
+        };
+      }
+    }
+  }
+
+  return json({
+    version: "2026-04-21-fmkorea-local-capture",
+    target,
+    shouldUseLocalCapture: shouldLocal,
+    localCaptureEndpoint: String(env.LOCAL_CAPTURE_ENDPOINT || ""),
+    localHealth,
+    localCapture
   });
 }
 
