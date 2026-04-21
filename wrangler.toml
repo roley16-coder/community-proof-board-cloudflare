@@ -25,8 +25,8 @@ binding = "BROWSER"
 
 [vars]
 SESSION_COOKIE_NAME = "cpb_session"
+LOCAL_CAPTURE_ENDPOINT = "https://facilitate-lasting-row-targets.trycloudflare.com/capture"
+LOCAL_CAPTURE_TOKEN = "cpb_local_token_20260421"
+LOCAL_CAPTURE_HOSTS = "fmkorea.com,www.fmkorea.com"
 
-# 실제 배포 시 Cloudflare Dashboard 또는 wrangler secret put 으로 설정
-# SESSION_SECRET
-
-# 서브도메인 연결은 deploy 후 Dashboard의 Workers Routes / Custom Domains 에서 설정
+# Configure SESSION_SECRET in Cloudflare dashboard or with wrangler secret put.
