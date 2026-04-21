@@ -18,7 +18,7 @@ const context = await chromium.launchPersistentContext(profileDir, {
   deviceScaleFactor: 1
 });
 
-const page = context.pages()[0] || await context.newPage();
+let activePage = context.pages()[0] || await context.newPage();
 
 console.log(`[local-capture] running on http://127.0.0.1:${port}`);
 console.log(`[local-capture] profile dir: ${profileDir}`);
@@ -44,7 +44,7 @@ const server = http.createServer(async (req, res) => {
       return sendJson(res, 400, { error: "url is required" });
     }
 
-    const screenshot = await captureWithLocalBrowser(page, url);
+    const screenshot = await captureWithLocalBrowser(url);
     res.writeHead(200, { "content-type": "image/png", "cache-control": "no-store" });
     res.end(screenshot);
   } catch (error) {
@@ -55,12 +55,22 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(port);
 
-async function captureWithLocalBrowser(page, url) {
+async function captureWithLocalBrowser(url) {
+  const page = await ensureActivePage();
   await page.goto(url, { waitUntil: "domcontentloaded", timeout: 120000 });
   await waitForUsefulRender(page);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.waitForTimeout(1200);
   return await page.screenshot({ type: "png", fullPage: false });
+}
+
+async function ensureActivePage() {
+  if (activePage && !activePage.isClosed()) {
+    return activePage;
+  }
+
+  activePage = context.pages().find((page) => !page.isClosed()) || await context.newPage();
+  return activePage;
 }
 
 async function waitForUsefulRender(page) {
