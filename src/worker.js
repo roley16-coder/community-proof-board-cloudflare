@@ -371,6 +371,11 @@ async function runScheduledRechecks(env) {
 }
 
 async function captureRemoteScreenshot(url, env) {
+  if (env.LOCAL_CAPTURE_ENDPOINT) {
+    const localCapture = await tryLocalCapture(url, env);
+    if (localCapture) return localCapture;
+  }
+
   if (!env.BROWSER) throw new Error("BROWSER binding is not configured");
   const browser = await puppeteer.launch(env.BROWSER);
   try {
@@ -384,6 +389,32 @@ async function captureRemoteScreenshot(url, env) {
     return await page.screenshot({ type: "png", fullPage: false });
   } finally {
     await browser.close();
+  }
+}
+
+async function tryLocalCapture(url, env) {
+  try {
+    const response = await fetch(env.LOCAL_CAPTURE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        ...(env.LOCAL_CAPTURE_TOKEN ? { "x-capture-token": env.LOCAL_CAPTURE_TOKEN } : {})
+      },
+      body: JSON.stringify({ url })
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      console.warn("local capture failed", response.status, text);
+      return null;
+    }
+
+    const buffer = await response.arrayBuffer();
+    if (!buffer.byteLength) return null;
+    return buffer;
+  } catch (error) {
+    console.warn("local capture unavailable", error);
+    return null;
   }
 }
 

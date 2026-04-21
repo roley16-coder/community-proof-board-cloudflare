@@ -5,7 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "local-capture": "node ./tools/local-capture-server.mjs"
+  },
+  "dependencies": {
+    "playwright": "^1.56.1"
   },
   "devDependencies": {
     "@cloudflare/puppeteer": "^1.0.4",
