@@ -182,6 +182,22 @@
     </div>
   </section>
 
+  <section id="imageViewerModal" class="image-viewer" hidden aria-modal="true" role="dialog" aria-labelledby="imageViewerTitle">
+    <div id="imageViewerBackdrop" class="image-viewer-backdrop"></div>
+    <div class="image-viewer-card" role="document">
+      <div class="image-viewer-toolbar">
+        <h2 id="imageViewerTitle">이미지 보기</h2>
+        <div class="image-viewer-actions">
+          <a id="imageViewerDownload" class="ghost-button" href="#" download>다운로드</a>
+          <button id="imageViewerClose" class="ghost-button" type="button">×</button>
+        </div>
+      </div>
+      <div class="image-viewer-body">
+        <img id="imageViewerImage" alt="게시 이미지">
+      </div>
+    </div>
+  </section>
+
   <template id="postTemplate">
     <article class="post-card">
       <div class="post-card-top">
@@ -194,8 +210,8 @@
       <p class="post-recheck"></p>
       <div class="post-links">
         <a class="action-link post-source" target="_blank" rel="noopener">원본 링크</a>
-        <a class="action-link post-initial-image-link" target="_blank" rel="noopener">첫게시 사진</a>
-        <a class="action-link post-recheck-image-link" target="_blank" rel="noopener">보장후 사진</a>
+        <button class="action-link post-initial-image-link" type="button">첫게시 사진</button>
+        <button class="action-link post-recheck-image-link" type="button">보장후 사진</button>
         <button class="ghost-button small post-copy" type="button">내용 복사</button>
       </div>
       <div class="post-actions">

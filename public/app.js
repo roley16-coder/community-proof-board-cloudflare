@@ -43,6 +43,11 @@ const els = {
   passwordTargetUserId: document.getElementById("passwordTargetUserId"),
   passwordTargetUsername: document.getElementById("passwordTargetUsername"),
   passwordValue: document.getElementById("passwordValue"),
+  imageViewerModal: document.getElementById("imageViewerModal"),
+  imageViewerBackdrop: document.getElementById("imageViewerBackdrop"),
+  imageViewerClose: document.getElementById("imageViewerClose"),
+  imageViewerImage: document.getElementById("imageViewerImage"),
+  imageViewerDownload: document.getElementById("imageViewerDownload"),
   postForm: document.getElementById("postForm"),
   postFormMessage: document.getElementById("postFormMessage"),
   assignedUserId: document.getElementById("assignedUserId"),
@@ -81,11 +86,16 @@ els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
 els.openPostModalButton.addEventListener("click", () => openModal("postModal"));
 els.toggleUserListButton.addEventListener("click", toggleUserList);
 els.modalBackdrop.addEventListener("click", closeAllModals);
+els.imageViewerBackdrop.addEventListener("click", closeImageViewer);
+els.imageViewerClose.addEventListener("click", closeImageViewer);
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", closeAllModals);
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key === "Escape") closeAllModals();
+  if (event.key === "Escape") {
+    closeImageViewer();
+    closeAllModals();
+  }
 });
 
 await loadApp();
@@ -232,15 +242,15 @@ function renderPosts() {
     const recheckImage = (post.images || []).find((image) => image.capture_type === "recheck");
 
     if (initialImage) {
-      initialImageLink.href = initialImage.url;
       initialImageLink.hidden = false;
+      initialImageLink.addEventListener("click", () => openImageViewer(initialImage.url, `${post.title || "첫게시 사진"}.png`));
     } else {
       initialImageLink.hidden = true;
     }
 
     if (recheckImage) {
-      recheckImageLink.href = recheckImage.url;
       recheckImageLink.hidden = false;
+      recheckImageLink.addEventListener("click", () => openImageViewer(recheckImage.url, `${post.title || "보장후 사진"}-recheck.png`));
     } else {
       recheckImageLink.hidden = true;
     }
@@ -469,6 +479,23 @@ function toggleUserList() {
   const willOpen = els.adminUsersPanel.hidden;
   els.adminUsersPanel.hidden = !willOpen;
   els.toggleUserListButton.textContent = willOpen ? "계정 목록 숨기기" : "계정 목록 보기";
+}
+
+function openImageViewer(url, filename) {
+  els.imageViewerImage.src = url;
+  els.imageViewerDownload.href = url;
+  els.imageViewerDownload.setAttribute("download", filename || "capture.png");
+  els.imageViewerModal.hidden = false;
+  document.body.classList.add("modal-open");
+}
+
+function closeImageViewer() {
+  els.imageViewerModal.hidden = true;
+  els.imageViewerImage.removeAttribute("src");
+  els.imageViewerDownload.href = "#";
+  if (els.userModal.hidden && els.postModal.hidden && els.passwordModal.hidden) {
+    document.body.classList.remove("modal-open");
+  }
 }
 
 async function fetchJson(url, options = {}) {
