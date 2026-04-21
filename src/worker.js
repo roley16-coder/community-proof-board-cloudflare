@@ -38,6 +38,12 @@ export default {
       if (url.pathname === "/api/users" && request.method === "POST") {
         return withCors(await handleCreateUser(request, env, session));
       }
+      if (url.pathname.startsWith("/api/users/") && request.method === "PATCH") {
+        return withCors(await handleUpdateUser(url.pathname.split("/").pop(), request, env, session));
+      }
+      if (url.pathname.startsWith("/api/users/") && request.method === "DELETE") {
+        return withCors(await handleDeleteUser(url.pathname.split("/").pop(), env, session));
+      }
       if (url.pathname === "/api/posts" && request.method === "GET") {
         return withCors(await handleListPosts(env, session));
       }
@@ -158,6 +164,40 @@ async function handleCreateUser(request, env, session) {
     "INSERT INTO users (id, username, display_name, role, password_salt, password_hash) VALUES (?, ?, ?, ?, ?, ?)"
   ).bind(userId, username, displayName, role, credentials.salt, credentials.hash).run();
 
+  return json({ success: true });
+}
+
+async function handleUpdateUser(userId, request, env, session) {
+  requireAdmin(session);
+  if (!userId) return json({ error: "User id is required" }, { status: 400 });
+
+  const body = await request.json();
+  const password = String(body.password || "");
+  validatePassword(password);
+
+  const user = await env.DB.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return json({ error: "User not found" }, { status: 404 });
+
+  const credentials = await hashPassword(password);
+  await env.DB.prepare(
+    "UPDATE users SET password_salt = ?, password_hash = ? WHERE id = ?"
+  ).bind(credentials.salt, credentials.hash, userId).run();
+
+  await env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId).run();
+  return json({ success: true });
+}
+
+async function handleDeleteUser(userId, env, session) {
+  requireAdmin(session);
+  if (!userId) return json({ error: "User id is required" }, { status: 400 });
+  if (userId === session.user.id) {
+    return json({ error: "현재 로그인한 관리자 계정은 삭제할 수 없습니다" }, { status: 400 });
+  }
+
+  const user = await env.DB.prepare("SELECT id FROM users WHERE id = ?").bind(userId).first();
+  if (!user) return json({ error: "User not found" }, { status: 404 });
+
+  await env.DB.prepare("DELETE FROM users WHERE id = ?").bind(userId).run();
   return json({ success: true });
 }
 

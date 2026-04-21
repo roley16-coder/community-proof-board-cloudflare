@@ -3,15 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>게시 인증 보드</title>
+  <title>커뮤핫딜 / 카페핫딜 게시 보드</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div>
-        <p class="eyebrow">Cloudflare MVP</p>
-        <h1>게시 인증 보드</h1>
+        <h1>커뮤핫딜 / 카페핫딜 게시 보드</h1>
       </div>
       <div class="topbar-actions">
         <div id="sessionInfo" class="session-info" hidden></div>
@@ -52,10 +51,11 @@
             <p>필요할 때만 열어서 계정과 게시글을 등록할 수 있습니다.</p>
           </div>
           <div class="admin-actions">
-            <button id="openUserModalButton" class="primary-button" type="button">사용자 계정 생성</button>
+            <button id="openUserModalButton" class="ghost-button" type="button">사용자 계정 생성</button>
             <button id="openPostModalButton" class="ghost-button" type="button">게시글 등록</button>
+            <button id="toggleUserListButton" class="ghost-button" type="button">계정 목록 보기</button>
           </div>
-          <div class="admin-users">
+          <div id="adminUsersPanel" class="admin-users" hidden>
             <div class="admin-users-head">
               <h3>계정 목록</h3>
               <span id="userCount" class="count-badge">0명</span>
@@ -164,6 +164,24 @@
     </div>
   </section>
 
+  <section id="passwordModal" class="modal" hidden aria-modal="true" role="dialog" aria-labelledby="passwordModalTitle">
+    <div class="modal-card">
+      <div class="modal-head">
+        <div>
+          <h2 id="passwordModalTitle">비밀번호 변경</h2>
+        </div>
+        <button class="modal-close ghost-button" type="button" data-close-modal="passwordModal">닫기</button>
+      </div>
+      <p id="passwordFormMessage" class="form-message" hidden></p>
+      <form id="passwordForm" class="stack-form">
+        <input id="passwordTargetUserId" type="hidden">
+        <label><span>대상 계정</span><input id="passwordTargetUsername" disabled></label>
+        <label><span>새 비밀번호</span><input id="passwordValue" type="password" required></label>
+        <button class="primary-button" type="submit">비밀번호 변경</button>
+      </form>
+    </div>
+  </section>
+
   <template id="postTemplate">
     <article class="post-card">
       <div class="post-card-top">
@@ -182,6 +200,21 @@
       </div>
       <div class="post-actions">
         <button type="button" class="danger-button small post-delete" hidden>삭제</button>
+      </div>
+    </article>
+  </template>
+
+  <template id="userTemplate">
+    <article class="user-item">
+      <div class="user-item-top">
+        <div>
+          <strong class="user-display-name"></strong>
+          <span class="user-meta"></span>
+        </div>
+      </div>
+      <div class="user-actions">
+        <button type="button" class="ghost-button small user-password-edit">비밀번호 변경</button>
+        <button type="button" class="danger-button small user-delete">계정 삭제</button>
       </div>
     </article>
   </template>

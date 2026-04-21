@@ -77,6 +77,10 @@ p {
   text-transform: uppercase;
 }
 
+.topbar h1 {
+  margin-bottom: 0;
+}
+
 .topbar-actions {
   display: flex;
   align-items: center;
@@ -135,11 +139,12 @@ p {
 
 .admin-actions {
   margin-top: 16px;
+  flex-direction: column;
+  align-items: stretch;
 }
 
-.admin-actions .primary-button,
 .admin-actions .ghost-button {
-  flex: 1;
+  width: 100%;
 }
 
 .admin-users {
@@ -283,11 +288,25 @@ textarea {
   background: rgba(255, 252, 247, 0.9);
 }
 
+.user-item-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
 .user-item span {
   display: block;
   margin-top: 4px;
   color: var(--muted);
   font-size: 0.9rem;
+}
+
+.user-actions {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .filter-select {
@@ -435,8 +454,7 @@ textarea {
   .topbar,
   .content-toolbar,
   .toolbar-actions,
-  .modal-head,
-  .admin-actions {
+  .modal-head {
     flex-direction: column;
     align-items: stretch;
   }
@@ -447,6 +465,10 @@ textarea {
 
   .post-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .user-actions {
+    grid-template-columns: 1fr;
   }
 }
 

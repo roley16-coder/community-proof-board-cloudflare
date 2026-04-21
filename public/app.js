@@ -23,9 +23,12 @@ const els = {
   adminMenuCard: document.getElementById("adminMenuCard"),
   openUserModalButton: document.getElementById("openUserModalButton"),
   openPostModalButton: document.getElementById("openPostModalButton"),
+  toggleUserListButton: document.getElementById("toggleUserListButton"),
+  adminUsersPanel: document.getElementById("adminUsersPanel"),
   modalBackdrop: document.getElementById("modalBackdrop"),
   userModal: document.getElementById("userModal"),
   postModal: document.getElementById("postModal"),
+  passwordModal: document.getElementById("passwordModal"),
   userForm: document.getElementById("userForm"),
   userFormMessage: document.getElementById("userFormMessage"),
   newUsername: document.getElementById("newUsername"),
@@ -34,6 +37,12 @@ const els = {
   newRole: document.getElementById("newRole"),
   userCount: document.getElementById("userCount"),
   userList: document.getElementById("userList"),
+  userTemplate: document.getElementById("userTemplate"),
+  passwordForm: document.getElementById("passwordForm"),
+  passwordFormMessage: document.getElementById("passwordFormMessage"),
+  passwordTargetUserId: document.getElementById("passwordTargetUserId"),
+  passwordTargetUsername: document.getElementById("passwordTargetUsername"),
+  passwordValue: document.getElementById("passwordValue"),
   postForm: document.getElementById("postForm"),
   postFormMessage: document.getElementById("postFormMessage"),
   assignedUserId: document.getElementById("assignedUserId"),
@@ -62,6 +71,7 @@ els.bootstrapForm.addEventListener("submit", onBootstrap);
 els.loginForm.addEventListener("submit", onLogin);
 els.logoutButton.addEventListener("click", onLogout);
 els.userForm.addEventListener("submit", onCreateUser);
+els.passwordForm.addEventListener("submit", onChangeUserPassword);
 els.postForm.addEventListener("submit", onCreatePost);
 els.refreshButton.addEventListener("click", onRefresh);
 els.sortFilter.addEventListener("change", onChangeSort);
@@ -69,6 +79,7 @@ els.prevPageButton.addEventListener("click", () => changePage(-1));
 els.nextPageButton.addEventListener("click", () => changePage(1));
 els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
 els.openPostModalButton.addEventListener("click", () => openModal("postModal"));
+els.toggleUserListButton.addEventListener("click", toggleUserList);
 els.modalBackdrop.addEventListener("click", closeAllModals);
 document.querySelectorAll("[data-close-modal]").forEach((button) => {
   button.addEventListener("click", closeAllModals);
@@ -139,10 +150,33 @@ async function loadUsersIfAdmin() {
   els.assignedUserId.innerHTML = "";
 
   for (const user of state.users) {
-    const item = document.createElement("article");
-    item.className = "user-item";
-    item.innerHTML = `<strong>${escapeHtml(user.display_name)}</strong><span>${escapeHtml(user.username)} · ${escapeHtml(user.role)}</span>`;
-    els.userList.appendChild(item);
+    const fragment = els.userTemplate.content.cloneNode(true);
+    fragment.querySelector(".user-display-name").textContent = user.display_name;
+    fragment.querySelector(".user-meta").textContent = `${user.username} · ${user.role}`;
+
+    const passwordButton = fragment.querySelector(".user-password-edit");
+    passwordButton.addEventListener("click", () => {
+      hideMessage(els.passwordFormMessage);
+      els.passwordForm.reset();
+      els.passwordTargetUserId.value = user.id;
+      els.passwordTargetUsername.value = `${user.display_name} (${user.username})`;
+      openModal("passwordModal");
+    });
+
+    const deleteButton = fragment.querySelector(".user-delete");
+    if (user.id === state.session.id) {
+      deleteButton.disabled = true;
+      deleteButton.textContent = "현재 계정";
+    } else {
+      deleteButton.addEventListener("click", async () => {
+        if (!window.confirm(`${user.display_name} 계정을 삭제할까요?`)) return;
+        await fetchJson(`/api/users/${user.id}`, { method: "DELETE" });
+        await loadUsersIfAdmin();
+        await loadPosts();
+      });
+    }
+
+    els.userList.appendChild(fragment);
 
     const option = document.createElement("option");
     option.value = user.id;
@@ -319,6 +353,29 @@ async function onCreateUser(event) {
   }
 }
 
+async function onChangeUserPassword(event) {
+  event.preventDefault();
+  hideMessage(els.passwordFormMessage);
+
+  try {
+    await fetchJson(`/api/users/${els.passwordTargetUserId.value}`, {
+      method: "PATCH",
+      body: JSON.stringify({
+        password: els.passwordValue.value
+      })
+    });
+
+    showMessage(els.passwordFormMessage, "비밀번호를 변경했습니다. 해당 계정은 다시 로그인해야 합니다.", "success");
+    window.setTimeout(() => {
+      closeAllModals();
+      hideMessage(els.passwordFormMessage);
+      els.passwordForm.reset();
+    }, 700);
+  } catch (error) {
+    showMessage(els.passwordFormMessage, error.message || "비밀번호를 변경하지 못했습니다.", "error");
+  }
+}
+
 async function onCreatePost(event) {
   event.preventDefault();
   hideMessage(els.postFormMessage);
@@ -404,7 +461,14 @@ function closeAllModals() {
   els.modalBackdrop.hidden = true;
   els.userModal.hidden = true;
   els.postModal.hidden = true;
+  els.passwordModal.hidden = true;
   document.body.classList.remove("modal-open");
+}
+
+function toggleUserList() {
+  const willOpen = els.adminUsersPanel.hidden;
+  els.adminUsersPanel.hidden = !willOpen;
+  els.toggleUserListButton.textContent = willOpen ? "계정 목록 숨기기" : "계정 목록 보기";
 }
 
 async function fetchJson(url, options = {}) {
