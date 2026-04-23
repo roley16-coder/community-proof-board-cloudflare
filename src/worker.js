@@ -370,6 +370,7 @@ async function createPostRecord({
   createdByUserId,
   telegramChatId = null
 }) {
+  await ensureTelegramTables(env);
   const assignedUser = await env.DB.prepare("SELECT id, username FROM users WHERE id = ?").bind(assignedUserId).first();
   if (!assignedUser) throw new HttpError(404, "Assigned user not found");
 
@@ -380,8 +381,8 @@ async function createPostRecord({
 
   await env.DB.prepare(`
     INSERT INTO posts
-      (id, assigned_user_id, title, content, posted_date, location, source_url, recheck_enabled, recheck_due_at, recheck_status, created_by_user_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (id, assigned_user_id, title, content, posted_date, location, source_url, recheck_enabled, recheck_due_at, recheck_status, created_by_user_id, telegram_chat_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).bind(
     postId,
     assignedUserId,
@@ -393,7 +394,8 @@ async function createPostRecord({
     enableRecheck ? 1 : 0,
     recheckDueAt,
     recheckStatus,
-    createdByUserId
+    createdByUserId,
+    telegramChatId ? String(telegramChatId) : null
   ).run();
 
   const imageId = crypto.randomUUID();
@@ -416,6 +418,11 @@ async function createPostRecord({
 }
 
 async function ensureTelegramTables(env) {
+  try {
+    await env.DB.prepare("ALTER TABLE posts ADD COLUMN telegram_chat_id TEXT").run();
+  } catch (_) {
+    // Ignore when the column already exists.
+  }
   await env.DB.prepare(`
     CREATE TABLE IF NOT EXISTS telegram_post_targets (
       post_id TEXT PRIMARY KEY REFERENCES posts(id) ON DELETE CASCADE,
@@ -593,23 +600,28 @@ function buildTelegramCaption({ phase, title, location, postedDate, sourceUrl })
 async function notifyTelegramRecheck(env, postId, screenshot) {
   if (!env.TELEGRAM_BOT_TOKEN) return;
   await ensureTelegramTables(env);
-  const target = await env.DB.prepare(
-    "SELECT chat_id FROM telegram_post_targets WHERE post_id = ?"
-  ).bind(postId).first();
-  if (!target?.chat_id) return;
-
   const post = await env.DB.prepare(
-    "SELECT title, location, posted_date, source_url FROM posts WHERE id = ?"
+    "SELECT title, location, posted_date, source_url, telegram_chat_id FROM posts WHERE id = ?"
   ).bind(postId).first();
   if (!post) return;
 
-  await sendTelegramPhoto(env, target.chat_id, screenshot, buildTelegramCaption({
+  let chatId = post.telegram_chat_id;
+  if (!chatId) {
+    const target = await env.DB.prepare(
+      "SELECT chat_id FROM telegram_post_targets WHERE post_id = ?"
+    ).bind(postId).first();
+    chatId = target?.chat_id || null;
+  }
+  if (!chatId) return;
+
+  await sendTelegramPhoto(env, chatId, screenshot, buildTelegramCaption({
     phase: "22시간 후 사진",
     title: post.title,
     location: post.location,
     postedDate: post.posted_date,
     sourceUrl: post.source_url
   }));
+  await sendTelegramText(env, chatId, "22시간 후 사진 전송 완료");
 }
 
 async function captureRemoteScreenshot(url, env) {
