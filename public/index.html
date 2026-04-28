@@ -196,9 +196,10 @@
         </div>
         <button class="modal-close ghost-button" type="button" data-close-modal="postModal">닫기</button>
       </div>
-      <p class="helper-text">원본 링크를 입력하면 해당 페이지에 접속해 자동으로 캡처한 뒤 저장합니다.</p>
+      <p id="postModalHelper" class="helper-text">원본 링크를 입력하면 해당 페이지에 접속해 자동으로 캡처한 뒤 저장합니다.</p>
       <p id="postFormMessage" class="form-message" hidden></p>
       <form id="postForm" class="stack-form">
+        <input id="postEditingId" type="hidden">
         <label>
           <span>보여줄 계정</span>
           <select id="assignedUserId" required></select>
@@ -297,6 +298,7 @@
         <button class="ghost-button small post-copy" type="button">내용 복사</button>
       </div>
       <div class="post-actions">
+        <button type="button" class="ghost-button small post-edit" hidden>수정</button>
         <button type="button" class="danger-button small post-delete" hidden>삭제</button>
       </div>
     </article>

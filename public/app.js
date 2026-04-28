@@ -55,8 +55,11 @@ const els = {
   imageViewerClose: document.getElementById("imageViewerClose"),
   imageViewerImage: document.getElementById("imageViewerImage"),
   imageViewerDownload: document.getElementById("imageViewerDownload"),
+  postModalTitle: document.getElementById("postModalTitle"),
+  postModalHelper: document.getElementById("postModalHelper"),
   postForm: document.getElementById("postForm"),
   postFormMessage: document.getElementById("postFormMessage"),
+  postEditingId: document.getElementById("postEditingId"),
   assignedUserId: document.getElementById("assignedUserId"),
   postTitle: document.getElementById("postTitle"),
   postContent: document.getElementById("postContent"),
@@ -103,7 +106,7 @@ els.sortFilter.addEventListener("change", onChangeSort);
 els.prevPageButton.addEventListener("click", () => changePage(-1));
 els.nextPageButton.addEventListener("click", () => changePage(1));
 els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
-els.openPostModalButton.addEventListener("click", () => openModal("postModal"));
+els.openPostModalButton.addEventListener("click", openCreatePostModal);
 els.openNoticeModalButton.addEventListener("click", () => openModal("noticeModal"));
 els.toggleUserListButton.addEventListener("click", toggleUserList);
 els.modalBackdrop.addEventListener("click", closeAllModals);
@@ -317,6 +320,10 @@ function renderPosts() {
 
     const deleteButton = fragment.querySelector(".post-delete");
     if (state.session.role === "admin") {
+      const editButton = fragment.querySelector(".post-edit");
+      editButton.hidden = false;
+      editButton.addEventListener("click", () => openEditPostModal(post));
+
       deleteButton.hidden = false;
       deleteButton.addEventListener("click", async () => {
         if (!window.confirm("이 게시글을 삭제할까요?")) return;
@@ -431,23 +438,45 @@ async function onCreatePost(event) {
   hideMessage(els.postFormMessage);
   els.postSubmitButton.disabled = true;
 
+  const isEditing = Boolean(els.postEditingId.value);
   const originalLabel = els.postSubmitButton.textContent;
-  els.postSubmitButton.textContent = "링크 접속 후 캡처 중...";
+  els.postSubmitButton.textContent = isEditing ? "게시글 수정 중..." : "링크 접속 후 캡처 중...";
 
   try {
-    const form = new FormData();
-    form.append("assignedUserId", els.assignedUserId.value);
-    form.append("title", els.postTitle.value);
-    form.append("content", els.postContent.value);
-    form.append("postedDate", els.postDate.value);
-    form.append("location", els.postLocation.value);
-    form.append("sourceUrl", els.postSourceUrl.value);
-    form.append("enableRecheck", els.postEnableRecheck.checked ? "1" : "0");
+    if (isEditing) {
+      await fetchJson(`/api/posts/${els.postEditingId.value}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          assignedUserId: els.assignedUserId.value,
+          title: els.postTitle.value,
+          content: els.postContent.value,
+          postedDate: els.postDate.value,
+          location: els.postLocation.value,
+          sourceUrl: els.postSourceUrl.value,
+          enableRecheck: els.postEnableRecheck.checked
+        })
+      });
+    } else {
+      const form = new FormData();
+      form.append("assignedUserId", els.assignedUserId.value);
+      form.append("title", els.postTitle.value);
+      form.append("content", els.postContent.value);
+      form.append("postedDate", els.postDate.value);
+      form.append("location", els.postLocation.value);
+      form.append("sourceUrl", els.postSourceUrl.value);
+      form.append("enableRecheck", els.postEnableRecheck.checked ? "1" : "0");
+      await fetchJson("/api/posts", { method: "POST", body: form });
+    }
 
-    await fetchJson("/api/posts", { method: "POST", body: form });
     els.postForm.reset();
+    els.postEditingId.value = "";
     els.postDate.value = new Date().toISOString().slice(0, 10);
-    showMessage(els.postFormMessage, "게시글 등록과 캡처 저장이 완료되었습니다.", "success");
+    resetPostModalMode();
+    showMessage(
+      els.postFormMessage,
+      isEditing ? "게시글 수정이 완료되었습니다." : "게시글 등록과 캡처 저장이 완료되었습니다.",
+      "success"
+    );
     await loadPosts();
     window.setTimeout(() => {
       closeAllModals();
@@ -484,6 +513,37 @@ function switchTab(tab) {
   if (tab === "notice" && state.session?.role !== "admin") return;
   state.currentTab = tab;
   syncTabs();
+}
+
+function openCreatePostModal() {
+  resetPostModalMode();
+  els.postForm.reset();
+  els.postEditingId.value = "";
+  els.postDate.value = new Date().toISOString().slice(0, 10);
+  hideMessage(els.postFormMessage);
+  openModal("postModal");
+}
+
+function openEditPostModal(post) {
+  els.postModalTitle.textContent = "게시글 수정";
+  els.postModalHelper.textContent = "저장된 게시글의 표시 정보와 재체크 설정을 수정합니다. 기존 캡처 이미지는 그대로 유지됩니다.";
+  els.postSubmitButton.textContent = "게시글 수정";
+  els.postEditingId.value = post.id;
+  els.assignedUserId.value = post.assigned_user_id;
+  els.postTitle.value = post.title || "";
+  els.postContent.value = post.content || "";
+  els.postDate.value = post.posted_date || new Date().toISOString().slice(0, 10);
+  els.postLocation.value = post.location || "";
+  els.postSourceUrl.value = post.source_url || "";
+  els.postEnableRecheck.checked = Boolean(post.recheck_enabled);
+  hideMessage(els.postFormMessage);
+  openModal("postModal");
+}
+
+function resetPostModalMode() {
+  els.postModalTitle.textContent = "게시글 등록";
+  els.postModalHelper.textContent = "원본 링크를 입력하면 해당 페이지에 접속해 자동으로 캡처한 뒤 저장합니다.";
+  els.postSubmitButton.textContent = "게시글 등록";
 }
 
 async function onCreateNotice(event) {

@@ -59,6 +59,9 @@ export default {
       if (url.pathname === "/api/posts" && request.method === "POST") {
         return withCors(await handleCreatePost(request, env, session));
       }
+      if (url.pathname.startsWith("/api/posts/") && request.method === "PATCH") {
+        return withCors(await handleUpdatePost(url.pathname.split("/").pop(), request, env, session));
+      }
       if (url.pathname.startsWith("/api/posts/") && request.method === "DELETE") {
         return withCors(await handleDeletePost(url.pathname.split("/").pop(), env, session));
       }
@@ -302,6 +305,62 @@ async function handleDeletePost(postId, env, session) {
     env.DB.prepare("DELETE FROM post_images WHERE post_id = ?").bind(postId),
     env.DB.prepare("DELETE FROM posts WHERE id = ?").bind(postId)
   ]);
+  return json({ success: true });
+}
+
+async function handleUpdatePost(postId, request, env, session) {
+  requireAdmin(session);
+  if (!postId) return json({ error: "Post id is required" }, { status: 400 });
+
+  const body = await request.json();
+  const assignedUserId = String(body.assignedUserId || "");
+  const title = nullableString(body.title);
+  const content = nullableString(body.content);
+  const postedDate = String(body.postedDate || "");
+  const location = String(body.location || "").trim();
+  const sourceUrl = nullableString(body.sourceUrl);
+  const enableRecheck = Boolean(body.enableRecheck);
+
+  if (!assignedUserId || !postedDate || !location || !sourceUrl) {
+    return json({ error: "assignedUserId, postedDate, location, sourceUrl are required" }, { status: 400 });
+  }
+
+  const assignedUser = await env.DB.prepare("SELECT id FROM users WHERE id = ?").bind(assignedUserId).first();
+  if (!assignedUser) return json({ error: "Assigned user not found" }, { status: 404 });
+
+  const existingPost = await env.DB.prepare("SELECT id FROM posts WHERE id = ?").bind(postId).first();
+  if (!existingPost) return json({ error: "Post not found" }, { status: 404 });
+
+  const recheckDueAt = enableRecheck ? new Date(Date.now() + 22 * 60 * 60 * 1000).toISOString() : null;
+  const recheckStatus = enableRecheck ? "scheduled" : "none";
+
+  await env.DB.prepare(`
+    UPDATE posts
+    SET assigned_user_id = ?,
+        title = ?,
+        content = ?,
+        posted_date = ?,
+        location = ?,
+        source_url = ?,
+        recheck_enabled = ?,
+        recheck_due_at = ?,
+        recheck_status = ?,
+        recheck_checked_at = NULL,
+        recheck_error = NULL
+    WHERE id = ?
+  `).bind(
+    assignedUserId,
+    title,
+    content,
+    postedDate,
+    location,
+    sourceUrl,
+    enableRecheck ? 1 : 0,
+    recheckDueAt,
+    recheckStatus,
+    postId
+  ).run();
+
   return json({ success: true });
 }
 
