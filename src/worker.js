@@ -62,6 +62,15 @@ export default {
       if (url.pathname.startsWith("/api/posts/") && request.method === "DELETE") {
         return withCors(await handleDeletePost(url.pathname.split("/").pop(), env, session));
       }
+      if (url.pathname === "/api/notices" && request.method === "GET") {
+        return withCors(await handleListNotices(env, session));
+      }
+      if (url.pathname === "/api/notices" && request.method === "POST") {
+        return withCors(await handleCreateNotice(request, env, session));
+      }
+      if (url.pathname.startsWith("/api/notices/") && request.method === "DELETE") {
+        return withCors(await handleDeleteNotice(url.pathname.split("/").pop(), env, session));
+      }
       if (url.pathname.startsWith("/api/images/") && request.method === "GET") {
         return await handleGetImage(url.pathname.split("/").pop(), env, session);
       }
@@ -293,6 +302,62 @@ async function handleDeletePost(postId, env, session) {
     env.DB.prepare("DELETE FROM post_images WHERE post_id = ?").bind(postId),
     env.DB.prepare("DELETE FROM posts WHERE id = ?").bind(postId)
   ]);
+  return json({ success: true });
+}
+
+async function ensureNoticeTable(env) {
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS notices (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `).run();
+}
+
+async function handleListNotices(env, session) {
+  requireAdmin(session);
+  await ensureNoticeTable(env);
+  const { results } = await env.DB.prepare(`
+    SELECT n.id, n.title, n.content, n.created_at, u.username AS created_by_username, u.display_name AS created_by_display_name
+    FROM notices n
+    JOIN users u ON u.id = n.created_by_user_id
+    ORDER BY n.created_at DESC
+  `).all();
+  return json({ notices: results });
+}
+
+async function handleCreateNotice(request, env, session) {
+  requireAdmin(session);
+  await ensureNoticeTable(env);
+  const body = await request.json();
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+
+  if (!title || !content) {
+    return json({ error: "title and content are required" }, { status: 400 });
+  }
+
+  const id = crypto.randomUUID();
+  await env.DB.prepare(`
+    INSERT INTO notices (id, title, content, created_by_user_id)
+    VALUES (?, ?, ?, ?)
+  `).bind(id, title, content, session.user.id).run();
+
+  return json({ success: true, noticeId: id });
+}
+
+async function handleDeleteNotice(noticeId, env, session) {
+  requireAdmin(session);
+  await ensureNoticeTable(env);
+  if (!noticeId) return json({ error: "Notice id is required" }, { status: 400 });
+
+  const notice = await env.DB.prepare("SELECT id FROM notices WHERE id = ?").bind(noticeId).first();
+  if (!notice) return json({ error: "Notice not found" }, { status: 404 });
+
+  await env.DB.prepare("DELETE FROM notices WHERE id = ?").bind(noticeId).run();
   return json({ success: true });
 }
 

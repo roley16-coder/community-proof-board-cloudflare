@@ -42,6 +42,15 @@ CREATE TABLE IF NOT EXISTS post_images (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS notices (
+  id TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  content TEXT NOT NULL,
+  created_by_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
 CREATE INDEX IF NOT EXISTS idx_posts_assigned_user_id ON posts(assigned_user_id);
 CREATE INDEX IF NOT EXISTS idx_post_images_post_id ON post_images(post_id);
+CREATE INDEX IF NOT EXISTS idx_notices_created_at ON notices(created_at);

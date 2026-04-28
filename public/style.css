@@ -498,6 +498,45 @@ textarea {
   padding-left: 20px;
 }
 
+.notice-form {
+  margin-top: 0;
+}
+
+.notice-form-actions,
+.notice-list-head,
+.saved-notice-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.saved-notices {
+  display: grid;
+  gap: 16px;
+}
+
+.saved-notice-card {
+  background: linear-gradient(180deg, rgba(255, 253, 249, 0.98) 0%, rgba(253, 248, 241, 0.96) 100%);
+}
+
+.saved-notice-title {
+  margin-bottom: 6px;
+}
+
+.saved-notice-meta {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.saved-notice-content {
+  margin-top: 14px;
+  color: var(--ink);
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -638,6 +677,13 @@ textarea {
 
   .notice-grid {
     grid-template-columns: 1fr;
+  }
+
+  .notice-form-actions,
+  .notice-list-head,
+  .saved-notice-top {
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .user-actions {
