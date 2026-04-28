@@ -494,7 +494,13 @@ textarea {
 
 .post-actions {
   margin-top: 12px;
-  justify-content: flex-end;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.post-actions > * {
+  width: 100%;
 }
 
 .empty-state {
