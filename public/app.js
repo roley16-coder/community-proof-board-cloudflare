@@ -28,12 +28,14 @@ const els = {
   adminMenuCard: document.getElementById("adminMenuCard"),
   openUserModalButton: document.getElementById("openUserModalButton"),
   openPostModalButton: document.getElementById("openPostModalButton"),
+  openNoticeModalButton: document.getElementById("openNoticeModalButton"),
   toggleUserListButton: document.getElementById("toggleUserListButton"),
   adminUsersPanel: document.getElementById("adminUsersPanel"),
   modalBackdrop: document.getElementById("modalBackdrop"),
   userModal: document.getElementById("userModal"),
   postModal: document.getElementById("postModal"),
   passwordModal: document.getElementById("passwordModal"),
+  noticeModal: document.getElementById("noticeModal"),
   userForm: document.getElementById("userForm"),
   userFormMessage: document.getElementById("userFormMessage"),
   newUsername: document.getElementById("newUsername"),
@@ -71,7 +73,6 @@ const els = {
   noticeForm: document.getElementById("noticeForm"),
   noticeTitle: document.getElementById("noticeTitle"),
   noticeContent: document.getElementById("noticeContent"),
-  fillNoticeDraftButton: document.getElementById("fillNoticeDraftButton"),
   noticeFormMessage: document.getElementById("noticeFormMessage"),
   noticeList: document.getElementById("noticeList"),
   noticeCount: document.getElementById("noticeCount"),
@@ -94,7 +95,6 @@ els.logoutButton.addEventListener("click", onLogout);
 els.intakeTabButton.addEventListener("click", () => switchTab("intake"));
 els.noticeTabButton.addEventListener("click", () => switchTab("notice"));
 els.noticeForm.addEventListener("submit", onCreateNotice);
-els.fillNoticeDraftButton.addEventListener("click", fillNoticeDraft);
 els.userForm.addEventListener("submit", onCreateUser);
 els.passwordForm.addEventListener("submit", onChangeUserPassword);
 els.postForm.addEventListener("submit", onCreatePost);
@@ -104,6 +104,7 @@ els.prevPageButton.addEventListener("click", () => changePage(-1));
 els.nextPageButton.addEventListener("click", () => changePage(1));
 els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
 els.openPostModalButton.addEventListener("click", () => openModal("postModal"));
+els.openNoticeModalButton.addEventListener("click", () => openModal("noticeModal"));
 els.toggleUserListButton.addEventListener("click", toggleUserList);
 els.modalBackdrop.addEventListener("click", closeAllModals);
 els.imageViewerBackdrop.addEventListener("click", closeImageViewer);
@@ -174,9 +175,6 @@ function showLoggedIn() {
   els.noticeTabButton.hidden = !isAdmin;
   if (!isAdmin && state.currentTab === "notice") {
     state.currentTab = "intake";
-  }
-  if (isAdmin) {
-    fillNoticeDraft();
   }
   els.adminMenuCard.hidden = !isAdmin;
   els.roleMessage.textContent = isAdmin
@@ -503,8 +501,11 @@ async function onCreateNotice(event) {
 
     showMessage(els.noticeFormMessage, "공지 등록이 완료되었습니다.", "success");
     els.noticeForm.reset();
-    fillNoticeDraft();
     await loadNoticesIfAdmin();
+    window.setTimeout(() => {
+      closeAllModals();
+      hideMessage(els.noticeFormMessage);
+    }, 500);
   } catch (error) {
     showMessage(els.noticeFormMessage, error.message || "공지 등록에 실패했습니다.", "error");
   }
@@ -543,6 +544,7 @@ function closeAllModals() {
   els.userModal.hidden = true;
   els.postModal.hidden = true;
   els.passwordModal.hidden = true;
+  els.noticeModal.hidden = true;
   document.body.classList.remove("modal-open");
 }
 
@@ -569,44 +571,6 @@ function renderNotices() {
       await loadNoticesIfAdmin();
     });
     els.noticeList.appendChild(fragment);
-  }
-}
-
-function fillNoticeDraft() {
-  if (!els.noticeTitle.value.trim()) {
-    els.noticeTitle.value = "커뮤/카페 핫딜 게시 보드 구축 진행 요약";
-  }
-
-  if (!els.noticeContent.value.trim()) {
-    els.noticeContent.value = [
-      "1. 요청 배경",
-      "- 커뮤니티와 카페에 업로드한 핫딜 게시글을 한 곳에서 관리하고, 실제 게시 여부를 캡처로 남기는 보드가 필요했습니다.",
-      "- 관리자와 조회 전용 계정을 분리하고, 텔레그램으로도 접수 및 확인이 가능하도록 요청했습니다.",
-      "",
-      "2. 주요 요청 사항",
-      "- 링크를 등록하면 자동으로 페이지에 접속해 첫 캡처를 저장",
-      "- 22시간 뒤 같은 링크를 다시 확인해 재체크 캡처 저장",
-      "- 관리자/뷰어 권한 분리",
-      "- 텔레그램 양식으로도 동일하게 등록 가능",
-      "- FMKorea처럼 보호 페이지가 있는 사이트도 처리 가능해야 함",
-      "",
-      "3. 시행착오 및 해결",
-      "- 초기에는 Cloudflare 브라우저 캡처만 사용해 FMKorea 사람 확인 페이지가 그대로 저장되는 문제가 있었습니다.",
-      "- 이를 해결하기 위해 FMKorea만 로컬 브라우저 캡처 경로를 우선 사용하도록 분리했습니다.",
-      "- 이미지 로딩 전에 캡처되는 문제는 본문 이미지 대기 로직을 넣어 보완했습니다.",
-      "- 텔레그램은 첫 캡처만 오고 22시간 후 사진이 누락되던 문제가 있어 chat_id 저장 및 재전송 로직을 보강했습니다.",
-      "",
-      "4. 현재 운영 상태",
-      "- 일반 사이트는 Cloudflare 캡처 경로 사용",
-      "- FMKorea는 로컬 캡처 서버와 터널을 이용한 우회 경로 사용",
-      "- 관리자에서 직접 접수/공지 관리 가능",
-      "- 텔레그램으로 첫 캡처와 22시간 후 사진 회신 가능",
-      "",
-      "5. 운영 시 주의 사항",
-      "- FMKorea 캡처를 위해 로컬 캡처 서버와 터널 프로세스가 켜져 있어야 합니다.",
-      "- 로컬 브라우저의 사람 확인 세션이 유지되어야 합니다.",
-      "- 텔레그램 토큰 변경 시 webhook 재설정이 필요합니다."
-    ].join("\n");
   }
 }
 
