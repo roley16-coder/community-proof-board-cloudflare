@@ -613,6 +613,12 @@ textarea {
   align-items: flex-start;
 }
 
+.saved-notice-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
 .saved-notices {
   display: grid;
   gap: 16px;

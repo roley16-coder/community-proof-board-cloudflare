@@ -71,6 +71,9 @@ export default {
       if (url.pathname === "/api/notices" && request.method === "POST") {
         return withCors(await handleCreateNotice(request, env, session));
       }
+      if (url.pathname.startsWith("/api/notices/") && request.method === "PATCH") {
+        return withCors(await handleUpdateNotice(url.pathname.split("/").pop(), request, env, session));
+      }
       if (url.pathname.startsWith("/api/notices/") && request.method === "DELETE") {
         return withCors(await handleDeleteNotice(url.pathname.split("/").pop(), env, session));
       }
@@ -406,6 +409,31 @@ async function handleCreateNotice(request, env, session) {
   `).bind(id, title, content, session.user.id).run();
 
   return json({ success: true, noticeId: id });
+}
+
+async function handleUpdateNotice(noticeId, request, env, session) {
+  requireAdmin(session);
+  await ensureNoticeTable(env);
+  if (!noticeId) return json({ error: "Notice id is required" }, { status: 400 });
+
+  const body = await request.json();
+  const title = String(body.title || "").trim();
+  const content = String(body.content || "").trim();
+
+  if (!title || !content) {
+    return json({ error: "title and content are required" }, { status: 400 });
+  }
+
+  const notice = await env.DB.prepare("SELECT id FROM notices WHERE id = ?").bind(noticeId).first();
+  if (!notice) return json({ error: "Notice not found" }, { status: 404 });
+
+  await env.DB.prepare(`
+    UPDATE notices
+    SET title = ?, content = ?
+    WHERE id = ?
+  `).bind(title, content, noticeId).run();
+
+  return json({ success: true });
 }
 
 async function handleDeleteNotice(noticeId, env, session) {

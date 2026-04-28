@@ -36,6 +36,7 @@ const els = {
   postModal: document.getElementById("postModal"),
   passwordModal: document.getElementById("passwordModal"),
   noticeModal: document.getElementById("noticeModal"),
+  noticeModalTitle: document.getElementById("noticeModalTitle"),
   userForm: document.getElementById("userForm"),
   userFormMessage: document.getElementById("userFormMessage"),
   newUsername: document.getElementById("newUsername"),
@@ -74,9 +75,11 @@ const els = {
   postsView: document.getElementById("postsView"),
   noticeView: document.getElementById("noticeView"),
   noticeForm: document.getElementById("noticeForm"),
+  noticeEditingId: document.getElementById("noticeEditingId"),
   noticeTitle: document.getElementById("noticeTitle"),
   noticeContent: document.getElementById("noticeContent"),
   noticeFormMessage: document.getElementById("noticeFormMessage"),
+  noticeSubmitButton: document.getElementById("noticeSubmitButton"),
   noticeList: document.getElementById("noticeList"),
   noticeCount: document.getElementById("noticeCount"),
   noticeEmptyState: document.getElementById("noticeEmptyState"),
@@ -107,7 +110,7 @@ els.prevPageButton.addEventListener("click", () => changePage(-1));
 els.nextPageButton.addEventListener("click", () => changePage(1));
 els.openUserModalButton.addEventListener("click", () => openModal("userModal"));
 els.openPostModalButton.addEventListener("click", openCreatePostModal);
-els.openNoticeModalButton.addEventListener("click", () => openModal("noticeModal"));
+els.openNoticeModalButton.addEventListener("click", openCreateNoticeModal);
 els.toggleUserListButton.addEventListener("click", toggleUserList);
 els.modalBackdrop.addEventListener("click", closeAllModals);
 els.imageViewerBackdrop.addEventListener("click", closeImageViewer);
@@ -549,18 +552,21 @@ function resetPostModalMode() {
 async function onCreateNotice(event) {
   event.preventDefault();
   hideMessage(els.noticeFormMessage);
+  const isEditing = Boolean(els.noticeEditingId.value);
 
   try {
-    await fetchJson("/api/notices", {
-      method: "POST",
+    await fetchJson(isEditing ? `/api/notices/${els.noticeEditingId.value}` : "/api/notices", {
+      method: isEditing ? "PATCH" : "POST",
       body: JSON.stringify({
         title: els.noticeTitle.value,
         content: els.noticeContent.value
       })
     });
 
-    showMessage(els.noticeFormMessage, "공지 등록이 완료되었습니다.", "success");
+    showMessage(els.noticeFormMessage, isEditing ? "공지 수정이 완료되었습니다." : "공지 등록이 완료되었습니다.", "success");
     els.noticeForm.reset();
+    els.noticeEditingId.value = "";
+    resetNoticeModalMode();
     await loadNoticesIfAdmin();
     window.setTimeout(() => {
       closeAllModals();
@@ -614,6 +620,29 @@ function toggleUserList() {
   els.toggleUserListButton.textContent = willOpen ? "계정 목록 숨기기" : "계정 목록 보기";
 }
 
+function openCreateNoticeModal() {
+  resetNoticeModalMode();
+  els.noticeForm.reset();
+  els.noticeEditingId.value = "";
+  hideMessage(els.noticeFormMessage);
+  openModal("noticeModal");
+}
+
+function openEditNoticeModal(notice) {
+  els.noticeModalTitle.textContent = "공지 수정";
+  els.noticeSubmitButton.textContent = "공지 수정";
+  els.noticeEditingId.value = notice.id;
+  els.noticeTitle.value = notice.title || "";
+  els.noticeContent.value = notice.content || "";
+  hideMessage(els.noticeFormMessage);
+  openModal("noticeModal");
+}
+
+function resetNoticeModalMode() {
+  els.noticeModalTitle.textContent = "공지 등록";
+  els.noticeSubmitButton.textContent = "공지 등록";
+}
+
 function renderNotices() {
   els.noticeCount.textContent = `${state.notices.length}건`;
   els.noticeList.innerHTML = "";
@@ -625,6 +654,9 @@ function renderNotices() {
     fragment.querySelector(".saved-notice-meta").textContent =
       `${formatDateTime(notice.created_at)} · ${notice.created_by_display_name} (${notice.created_by_username})`;
     fragment.querySelector(".saved-notice-content").textContent = notice.content;
+    fragment.querySelector(".notice-edit").addEventListener("click", () => {
+      openEditNoticeModal(notice);
+    });
     fragment.querySelector(".notice-delete").addEventListener("click", async () => {
       if (!window.confirm("이 공지를 삭제할까요?")) return;
       await fetchJson(`/api/notices/${notice.id}`, { method: "DELETE" });
