@@ -87,6 +87,31 @@ p {
   gap: 10px;
 }
 
+.header-tabs {
+  margin-top: 14px;
+  display: flex;
+  gap: 10px;
+}
+
+.tab-button {
+  border: 1px solid var(--line);
+  background: rgba(255, 252, 247, 0.92);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 11px 18px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  transition: 0.18s ease;
+}
+
+.tab-button.is-active {
+  background: var(--accent);
+  border-color: rgba(200, 100, 47, 0.28);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(200, 100, 47, 0.2);
+}
+
 .session-info {
   padding: 10px 14px;
   border-radius: 999px;
@@ -414,6 +439,65 @@ textarea {
   font-weight: 700;
 }
 
+.notice-panel {
+  display: grid;
+  gap: 18px;
+}
+
+.notice-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.notice-hero {
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(200, 100, 47, 0.18);
+  background: linear-gradient(135deg, rgba(200, 100, 47, 0.12) 0%, rgba(255, 249, 242, 0.92) 100%);
+}
+
+.notice-hero strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 1rem;
+}
+
+.notice-hero p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+.notice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.notice-card {
+  padding: 18px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: rgba(255, 252, 247, 0.88);
+}
+
+.notice-card h3 {
+  margin-bottom: 12px;
+}
+
+.notice-list {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.notice-list-ordered {
+  padding-left: 20px;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -552,6 +636,10 @@ textarea {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .notice-grid {
+    grid-template-columns: 1fr;
+  }
+
   .user-actions {
     grid-template-columns: 1fr;
   }
@@ -577,6 +665,10 @@ textarea {
 
   .post-grid {
     grid-template-columns: 1fr;
+  }
+
+  .header-tabs {
+    flex-direction: column;
   }
 
   .image-viewer {

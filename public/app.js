@@ -5,7 +5,8 @@ const state = {
   users: [],
   posts: [],
   sort: "posted-desc",
-  page: 1
+  page: 1,
+  currentTab: "intake"
 };
 
 const els = {
@@ -18,6 +19,9 @@ const els = {
   loginForm: document.getElementById("loginForm"),
   loginUsername: document.getElementById("loginUsername"),
   loginPassword: document.getElementById("loginPassword"),
+  headerTabs: document.getElementById("headerTabs"),
+  intakeTabButton: document.getElementById("intakeTabButton"),
+  noticeTabButton: document.getElementById("noticeTabButton"),
   sessionInfo: document.getElementById("sessionInfo"),
   logoutButton: document.getElementById("logoutButton"),
   adminMenuCard: document.getElementById("adminMenuCard"),
@@ -61,6 +65,8 @@ const els = {
   refreshButton: document.getElementById("refreshButton"),
   sortFilter: document.getElementById("sortFilter"),
   roleMessage: document.getElementById("roleMessage"),
+  postsView: document.getElementById("postsView"),
+  noticeView: document.getElementById("noticeView"),
   posts: document.getElementById("posts"),
   emptyState: document.getElementById("emptyState"),
   pagination: document.getElementById("pagination"),
@@ -75,6 +81,8 @@ els.postDate.value = new Date().toISOString().slice(0, 10);
 els.bootstrapForm.addEventListener("submit", onBootstrap);
 els.loginForm.addEventListener("submit", onLogin);
 els.logoutButton.addEventListener("click", onLogout);
+els.intakeTabButton.addEventListener("click", () => switchTab("intake"));
+els.noticeTabButton.addEventListener("click", () => switchTab("notice"));
 els.userForm.addEventListener("submit", onCreateUser);
 els.passwordForm.addEventListener("submit", onChangeUserPassword);
 els.postForm.addEventListener("submit", onCreatePost);
@@ -121,7 +129,10 @@ async function loadApp() {
 function showLoggedOut(bootstrapNeeded) {
   state.users = [];
   state.posts = [];
+  state.currentTab = "intake";
   closeAllModals();
+  els.headerTabs.hidden = true;
+  els.noticeTabButton.hidden = true;
   els.sessionInfo.hidden = true;
   els.logoutButton.hidden = true;
   els.adminMenuCard.hidden = true;
@@ -132,6 +143,7 @@ function showLoggedOut(bootstrapNeeded) {
   els.posts.innerHTML = "";
   els.emptyState.hidden = false;
   els.pagination.hidden = true;
+  syncTabs();
 }
 
 function showLoggedIn() {
@@ -144,10 +156,16 @@ function showLoggedIn() {
   els.sessionInfo.textContent = `${state.session.display_name} (${state.session.username}) · ${state.session.role}`;
 
   const isAdmin = state.session.role === "admin";
+  els.headerTabs.hidden = false;
+  els.noticeTabButton.hidden = !isAdmin;
+  if (!isAdmin && state.currentTab === "notice") {
+    state.currentTab = "intake";
+  }
   els.adminMenuCard.hidden = !isAdmin;
   els.roleMessage.textContent = isAdmin
     ? "전체 게시글을 보고 계정과 게시글을 관리할 수 있습니다."
     : "배정된 게시글만 조회할 수 있습니다. 새로고침, 내용 복사, 원본 링크 이동, 사진 보기가 가능합니다.";
+  syncTabs();
 }
 
 async function loadUsersIfAdmin() {
@@ -439,6 +457,12 @@ function changePage(delta) {
   renderPosts();
 }
 
+function switchTab(tab) {
+  if (tab === "notice" && state.session?.role !== "admin") return;
+  state.currentTab = tab;
+  syncTabs();
+}
+
 function clampPage() {
   const totalPages = Math.max(1, Math.ceil(state.posts.length / PAGE_SIZE));
   state.page = Math.min(Math.max(1, state.page), totalPages);
@@ -479,6 +503,18 @@ function toggleUserList() {
   const willOpen = els.adminUsersPanel.hidden;
   els.adminUsersPanel.hidden = !willOpen;
   els.toggleUserListButton.textContent = willOpen ? "계정 목록 숨기기" : "계정 목록 보기";
+}
+
+function syncTabs() {
+  const isAdmin = state.session?.role === "admin";
+  const showNotice = isAdmin && state.currentTab === "notice";
+
+  els.intakeTabButton.classList.toggle("is-active", !showNotice);
+  els.noticeTabButton.classList.toggle("is-active", showNotice);
+  els.noticeTabButton.hidden = !isAdmin;
+
+  els.postsView.hidden = showNotice;
+  els.noticeView.hidden = !showNotice;
 }
 
 function openImageViewer(url, filename) {
