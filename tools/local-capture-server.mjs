@@ -5,6 +5,7 @@ import os from "node:os";
 import { chromium } from "playwright";
 
 const port = Number(process.env.LOCAL_CAPTURE_PORT || 8788);
+const host = process.env.LOCAL_CAPTURE_HOST || "127.0.0.1";
 const authToken = process.env.LOCAL_CAPTURE_TOKEN || "";
 const browserPath = process.env.LOCAL_CAPTURE_BROWSER_PATH || "";
 const profileDir = process.env.LOCAL_CAPTURE_PROFILE_DIR || path.join(os.homedir(), ".community-proof-board", "browser-profile");
@@ -20,7 +21,11 @@ const context = await chromium.launchPersistentContext(profileDir, {
 
 let activePage = context.pages()[0] || await context.newPage();
 
-console.log(`[local-capture] running on http://127.0.0.1:${port}`);
+if (!authToken) {
+  console.warn("[local-capture] LOCAL_CAPTURE_TOKEN is not set. /capture is exposed to anyone who can reach this server.");
+}
+
+console.log(`[local-capture] running on http://${host}:${port}`);
 console.log(`[local-capture] profile dir: ${profileDir}`);
 console.log("[local-capture] first run tip: open FMKorea once in this window and solve any human check manually.");
 
@@ -53,7 +58,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port);
+server.listen(port, host);
 
 async function captureWithLocalBrowser(url) {
   const page = await ensureActivePage();

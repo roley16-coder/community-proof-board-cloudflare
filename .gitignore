@@ -1,0 +1,10 @@
+node_modules/
+
+tools/local-capture.env
+tools/*.log
+tools/*.err.log
+tools/*.json
+tools/*.bin
+tools/*-test.png
+tools/capture_headers*.txt
+tools/cloudflared.exe
